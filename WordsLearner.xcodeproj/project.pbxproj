@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		00B953392EC59D4600D80764 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 00B953382EC59D4600D80764 /* Markdown */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		0051EDD62EC44A90008DB61F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				00B953392EC59D4600D80764 /* Markdown in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = WordsLearner;
 			packageProductDependencies = (
+				00B953382EC59D4600D80764 /* Markdown */,
 			);
 			productName = WordsLearner;
 			productReference = 0051EDC82EC44A8D008DB61F /* WordsLearner.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = 0051EDBF2EC44A8D008DB61F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				00B953372EC59D4600D80764 /* XCRemoteSwiftPackageReference "swift-markdown" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0051EDC92EC44A8D008DB61F /* Products */;
 			projectDirPath = "";
@@ -578,6 +587,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		00B953372EC59D4600D80764 /* XCRemoteSwiftPackageReference "swift-markdown" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-markdown";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.7.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		00B953382EC59D4600D80764 /* Markdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 00B953372EC59D4600D80764 /* XCRemoteSwiftPackageReference "swift-markdown" */;
+			productName = Markdown;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 0051EDC02EC44A8D008DB61F /* Project object */;
 }

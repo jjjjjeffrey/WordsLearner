@@ -8,10 +8,11 @@
 import SwiftUI
 
 @main
-struct WordsLearnerApp: App {
+struct EnglishWordComparatorApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            WordComparatorMainView()
         }
     }
 }
+
