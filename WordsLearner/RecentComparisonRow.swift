@@ -17,14 +17,14 @@ struct RecentComparisonRow: View {
                     HStack {
                         Text(comparison.word1)
                             .fontWeight(.semibold)
-                            .foregroundColor(.blue)
+                            .foregroundColor(AppColors.word1Color)
                         
                         Text("vs")
                             .foregroundColor(.secondary)
                         
                         Text(comparison.word2)
                             .fontWeight(.semibold)
-                            .foregroundColor(.green)
+                            .foregroundColor(AppColors.word2Color)
                     }
                     
                     Text(comparison.sentence)
@@ -46,7 +46,7 @@ struct RecentComparisonRow: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(.systemGray6))
+                    .fill(AppColors.cardBackground)
             )
         }
         .buttonStyle(PlainButtonStyle())

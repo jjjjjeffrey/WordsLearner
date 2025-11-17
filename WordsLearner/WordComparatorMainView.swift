@@ -13,41 +13,53 @@ struct WordComparatorMainView: View {
     @State private var showingSettings = false
     
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    headerView
-                    
-                    if !apiKeyManager.hasValidAPIKey {
-                        apiKeyWarningView
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        headerView
+                        
+                        if !apiKeyManager.hasValidAPIKey {
+                            apiKeyWarningView
+                        }
+                        
+                        inputFieldsView
+                        generateButtonView
+                        recentComparisonsList
                     }
-                    
-                    inputFieldsView
-                    generateButtonView
-                    recentComparisonsList
+                    .padding()
                 }
-                .padding()
-            }
-            .navigationTitle("Word Comparator")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        showingSettings = true
-                    }) {
-                        Image(systemName: "gear")
-                            .foregroundColor(.primary)
+                .navigationTitle("Word Comparator")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.large)
+                #endif
+                .toolbar {
+                    #if os(iOS)
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        settingsButton
                     }
+                    #else
+                    ToolbarItem(placement: .primaryAction) {
+                        settingsButton
+                    }
+                    #endif
                 }
-            }
-            .navigationDestination(isPresented: $viewModel.shouldNavigateToDetail) {
-                ResponseDetailView(viewModel: viewModel)
-            }
-            .sheet(isPresented: $showingSettings) {
-                SettingsView()
+                .navigationDestination(isPresented: $viewModel.shouldNavigateToDetail) {
+                    ResponseDetailView(viewModel: viewModel)
+                }
+                .sheet(isPresented: $showingSettings) {
+                    SettingsView()
+                }
             }
         }
-    }
+        
+        private var settingsButton: some View {
+            Button(action: {
+                showingSettings = true
+            }) {
+                Image(systemName: "gear")
+                    .foregroundColor(.primary)
+            }
+        }
     
     private var headerView: some View {
         VStack(spacing: 8) {
@@ -92,7 +104,7 @@ struct WordComparatorMainView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.orange.opacity(0.1))
+                .fill(AppColors.warning.opacity(0.1))
         )
     }
     
@@ -147,7 +159,7 @@ struct WordComparatorMainView: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill((viewModel.canGenerate && apiKeyManager.hasValidAPIKey) ? Color.blue : Color.gray.opacity(0.3))
+                    .fill((viewModel.canGenerate && apiKeyManager.hasValidAPIKey) ? AppColors.primary : AppColors.separator)
             )
             .foregroundColor((viewModel.canGenerate && apiKeyManager.hasValidAPIKey) ? .white : .gray)
         }

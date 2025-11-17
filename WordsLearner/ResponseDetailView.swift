@@ -11,41 +11,49 @@ struct ResponseDetailView: View {
     @ObservedObject var viewModel: WordComparatorViewModel
     
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                headerSection
-                
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 16) {
-                            comparisonInfoCard
-                            streamingResponseView
-                            Spacer(minLength: 100) // Bottom padding
+            NavigationStack {
+                VStack(spacing: 0) {
+                    headerSection
+                    
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 16) {
+                                comparisonInfoCard
+                                streamingResponseView
+                                Spacer(minLength: 100) // Bottom padding
+                            }
+                            .padding()
                         }
-                        .padding()
-                    }
-                    .onChange(of: viewModel.streamingResponse) { _ in
-                        // Auto-scroll to bottom as content is being streamed
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            proxy.scrollTo("bottom", anchor: .bottom)
+                        .onChange(of: viewModel.streamingResponse) { _ in
+                            // Auto-scroll to bottom as content is being streamed
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                proxy.scrollTo("bottom", anchor: .bottom)
+                            }
                         }
                     }
                 }
             }
-        }
-        .navigationTitle("Comparison Result")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                shareButton
+            .navigationTitle("Comparison Result")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                #if os(iOS)
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    shareButton
+                }
+                #else
+                ToolbarItem(placement: .primaryAction) {
+                    shareButton
+                }
+                #endif
+            }
+            .onAppear {
+                if viewModel.shouldStartStreaming {
+                    viewModel.startStreamingComparison()
+                }
             }
         }
-        .onAppear {
-            if viewModel.shouldStartStreaming {
-                viewModel.startStreamingComparison()
-            }
-        }
-    }
     
     private var headerSection: some View {
         VStack(spacing: 0) {
@@ -127,7 +135,7 @@ struct ResponseDetailView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .background(Color(.systemGray6))
+        .background(AppColors.secondaryBackground)
     }
 
     
@@ -141,7 +149,7 @@ struct ResponseDetailView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(.systemGray6))
+                        .fill(AppColors.cardBackground)
                 )
         }
     }
@@ -162,8 +170,8 @@ struct ResponseDetailView: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.systemBackground))
-                            .shadow(color: .gray.opacity(0.2), radius: 2, x: 0, y: 1)
+                            .fill(AppColors.background)
+                            .shadow(color: AppColors.separator.opacity(0.3), radius: 2, x: 0, y: 1)
                     )
             }
             
@@ -175,29 +183,54 @@ struct ResponseDetailView: View {
     }
     
     private var shareButton: some View {
-        Button(action: shareComparison) {
-            Image(systemName: "square.and.arrow.up")
+            Button(action: shareComparison) {
+                Image(systemName: "square.and.arrow.up")
+            }
+            .disabled(viewModel.streamingResponse.isEmpty)
         }
-        .disabled(viewModel.streamingResponse.isEmpty)
-    }
-    
-    private func shareComparison() {
-        let shareText = """
-        Word Comparison: \(viewModel.word1) vs \(viewModel.word2)
         
-        Context: \(viewModel.sentence)
-        
-        Analysis:
-        \(viewModel.streamingResponse)
-        """
-        
-        let activityVC = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
-        
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first {
-            window.rootViewController?.present(activityVC, animated: true)
+        private func shareComparison() {
+            let shareText = """
+            Word Comparison: \(viewModel.word1) vs \(viewModel.word2)
+            
+            Context: \(viewModel.sentence)
+            
+            Analysis:
+            \(viewModel.streamingResponse)
+            """
+            
+            #if os(iOS)
+            shareOnIOS(text: shareText)
+            #else
+            shareOnMacOS(text: shareText)
+            #endif
         }
-    }
+        
+        #if os(iOS)
+        private func shareOnIOS(text: String) {
+            let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+            
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first {
+                window.rootViewController?.present(activityVC, animated: true)
+            }
+        }
+        #endif
+        
+        #if os(macOS)
+        private func shareOnMacOS(text: String) {
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(text, forType: .string)
+            
+            // 可以选择显示一个通知或者弹窗告诉用户内容已复制
+            // 这里我们可以添加一个简单的通知
+            DispatchQueue.main.async {
+                // 你可以在这里添加一个 toast 通知或者其他反馈
+                print("Content copied to clipboard")
+            }
+        }
+        #endif
 }
 
 

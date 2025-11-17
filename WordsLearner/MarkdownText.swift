@@ -187,7 +187,7 @@ struct AttributedStringRenderer {
     private func renderCodeBlock(_ codeBlock: CodeBlock) -> AttributedString {
         var result = AttributedString(codeBlock.code)
         result.font = .system(.body, design: .monospaced)
-        result.backgroundColor = Color(.systemGray6)
+        result.backgroundColor = AppColors.fieldBackground
         result.append(AttributedString("\n\n"))
         return result
     }
@@ -232,7 +232,7 @@ struct AttributedStringRenderer {
     private func renderInlineCode(_ inlineCode: InlineCode) -> AttributedString {
         var result = AttributedString(inlineCode.code)
         result.font = .system(.body, design: .monospaced)
-        result.backgroundColor = Color(.systemGray6)
+        result.backgroundColor = AppColors.fieldBackground
         return result
     }
     

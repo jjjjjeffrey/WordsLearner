@@ -13,8 +13,8 @@ struct CustomTextFieldStyle: TextFieldStyle {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemGray6))
-                    .stroke(Color(.systemGray4), lineWidth: 1)
+                    .fill(AppColors.fieldBackground)
+                    .stroke(AppColors.fieldBorder, lineWidth: 1)
             )
     }
 }
