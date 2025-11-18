@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0012AB382ECC37DD003E40E4 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = 0012AB372ECC37DD003E40E4 /* ComposableArchitecture */; };
+		0012AB3B2ECC382F003E40E4 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 0012AB3A2ECC382F003E40E4 /* SQLiteData */; };
+		0012AB3D2ECC382F003E40E4 /* SQLiteDataTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 0012AB3C2ECC382F003E40E4 /* SQLiteDataTestSupport */; };
 		00B953392EC59D4600D80764 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 00B953382EC59D4600D80764 /* Markdown */; };
 /* End PBXBuildFile section */
 
@@ -56,6 +59,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0012AB3B2ECC382F003E40E4 /* SQLiteData in Frameworks */,
+				0012AB382ECC37DD003E40E4 /* ComposableArchitecture in Frameworks */,
 				00B953392EC59D4600D80764 /* Markdown in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -64,6 +69,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0012AB3D2ECC382F003E40E4 /* SQLiteDataTestSupport in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -118,6 +124,8 @@
 			name = WordsLearner;
 			packageProductDependencies = (
 				00B953382EC59D4600D80764 /* Markdown */,
+				0012AB372ECC37DD003E40E4 /* ComposableArchitecture */,
+				0012AB3A2ECC382F003E40E4 /* SQLiteData */,
 			);
 			productName = WordsLearner;
 			productReference = 0051EDC82EC44A8D008DB61F /* WordsLearner.app */;
@@ -141,6 +149,7 @@
 			);
 			name = WordsLearnerTests;
 			packageProductDependencies = (
+				0012AB3C2ECC382F003E40E4 /* SQLiteDataTestSupport */,
 			);
 			productName = WordsLearnerTests;
 			productReference = 0051EDD52EC44A90008DB61F /* WordsLearnerTests.xctest */;
@@ -203,6 +212,8 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				00B953372EC59D4600D80764 /* XCRemoteSwiftPackageReference "swift-markdown" */,
+				0012AB362ECC37DD003E40E4 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */,
+				0012AB392ECC382F003E40E4 /* XCRemoteSwiftPackageReference "sqlite-data" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0051EDC92EC44A8D008DB61F /* Products */;
@@ -597,6 +608,22 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		0012AB362ECC37DD003E40E4 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-composable-architecture";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.23.1;
+			};
+		};
+		0012AB392ECC382F003E40E4 /* XCRemoteSwiftPackageReference "sqlite-data" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/sqlite-data";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.3.0;
+			};
+		};
 		00B953372EC59D4600D80764 /* XCRemoteSwiftPackageReference "swift-markdown" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/apple/swift-markdown";
@@ -608,6 +635,21 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		0012AB372ECC37DD003E40E4 /* ComposableArchitecture */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0012AB362ECC37DD003E40E4 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
+			productName = ComposableArchitecture;
+		};
+		0012AB3A2ECC382F003E40E4 /* SQLiteData */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0012AB392ECC382F003E40E4 /* XCRemoteSwiftPackageReference "sqlite-data" */;
+			productName = SQLiteData;
+		};
+		0012AB3C2ECC382F003E40E4 /* SQLiteDataTestSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0012AB392ECC382F003E40E4 /* XCRemoteSwiftPackageReference "sqlite-data" */;
+			productName = SQLiteDataTestSupport;
+		};
 		00B953382EC59D4600D80764 /* Markdown */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 00B953372EC59D4600D80764 /* XCRemoteSwiftPackageReference "swift-markdown" */;
