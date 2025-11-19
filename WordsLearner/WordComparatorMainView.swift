@@ -5,61 +5,67 @@
 //  Created by Jeffrey on 11/12/25.
 //
 
+import ComposableArchitecture
 import SwiftUI
 
 struct WordComparatorMainView: View {
-    @StateObject private var viewModel = WordComparatorViewModel()
-    @StateObject private var apiKeyManager = APIKeyManager.shared
-    @State private var showingSettings = false
+    @Bindable var store: StoreOf<WordComparatorFeature>
     
     var body: some View {
-            NavigationStack {
-                ScrollView {
-                    VStack(spacing: 20) {
-                        headerView
-                        
-                        if !apiKeyManager.hasValidAPIKey {
-                            apiKeyWarningView
-                        }
-                        
-                        inputFieldsView
-                        generateButtonView
-                        recentComparisonsList
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    headerView
+                    
+                    if !store.hasValidAPIKey {
+                        apiKeyWarningView
                     }
-                    .padding()
+                    
+                    inputFieldsView
+                    generateButtonView
+                    recentComparisonsList
                 }
-                .navigationTitle("Word Comparator")
+                .padding()
+            }
+            .navigationTitle("Word Comparator")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.large)
+            #endif
+            .toolbar {
                 #if os(iOS)
-                .navigationBarTitleDisplayMode(.large)
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    settingsButton
+                }
+                #else
+                ToolbarItem(placement: .primaryAction) {
+                    settingsButton
+                }
                 #endif
-                .toolbar {
-                    #if os(iOS)
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        settingsButton
-                    }
-                    #else
-                    ToolbarItem(placement: .primaryAction) {
-                        settingsButton
-                    }
-                    #endif
-                }
-                .navigationDestination(isPresented: $viewModel.shouldNavigateToDetail) {
-                    ResponseDetailView(viewModel: viewModel)
-                }
-                .sheet(isPresented: $showingSettings) {
-                    SettingsView()
-                }
+            }
+            .onAppear {
+                store.send(.onAppear)
+            }
+            .navigationDestination(
+                store: store.scope(state: \.$destination.detail, action: \.destination.detail)
+            ) { detailStore in
+                ResponseDetailView(store: detailStore)
+            }
+            .sheet(
+                item: $store.scope(state: \.destination?.settings, action: \.destination.settings)
+            ) { settingsStore in
+                SettingsView(store: settingsStore)
             }
         }
-        
-        private var settingsButton: some View {
-            Button(action: {
-                showingSettings = true
-            }) {
-                Image(systemName: "gear")
-                    .foregroundColor(.primary)
-            }
+    }
+    
+    private var settingsButton: some View {
+        Button {
+            store.send(.settingsButtonTapped)
+        } label: {
+            Image(systemName: "gear")
+                .foregroundColor(.primary)
         }
+    }
     
     private var headerView: some View {
         VStack(spacing: 8) {
@@ -96,7 +102,7 @@ struct WordComparatorMainView: View {
                 .multilineTextAlignment(.center)
             
             Button("Open Settings") {
-                showingSettings = true
+                store.send(.settingsButtonTapped)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
@@ -108,15 +114,13 @@ struct WordComparatorMainView: View {
         )
     }
     
-    // ... rest of the views remain the same
-    
     private var inputFieldsView: some View {
         VStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 Label("First Word", systemImage: "1.circle")
                     .font(.headline)
                 
-                TextField("Enter first word (e.g., character)", text: $viewModel.word1)
+                TextField("Enter first word (e.g., character)", text: $store.word1)
                     .textFieldStyle(CustomTextFieldStyle())
             }
             
@@ -124,7 +128,7 @@ struct WordComparatorMainView: View {
                 Label("Second Word", systemImage: "2.circle")
                     .font(.headline)
                 
-                TextField("Enter second word (e.g., characteristics)", text: $viewModel.word2)
+                TextField("Enter second word (e.g., characteristics)", text: $store.word2)
                     .textFieldStyle(CustomTextFieldStyle())
             }
             
@@ -132,7 +136,7 @@ struct WordComparatorMainView: View {
                 Label("Context Sentence", systemImage: "text.quote")
                     .font(.headline)
                 
-                TextField("Paste the sentence here", text: $viewModel.sentence, axis: .vertical)
+                TextField("Paste the sentence here", text: $store.sentence, axis: .vertical)
                     .textFieldStyle(CustomTextFieldStyle())
                     .lineLimit(3...6)
             }
@@ -141,42 +145,36 @@ struct WordComparatorMainView: View {
     }
     
     private var generateButtonView: some View {
-        Button(action: {
-            viewModel.startComparison()
-        }) {
+        Button {
+            store.send(.generateButtonTapped)
+        } label: {
             HStack {
-                if viewModel.isLoading {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: "sparkles")
-                }
-                
-                Text(viewModel.isLoading ? "Generating..." : "Generate Comparison")
+                Image(systemName: "sparkles")
+                Text("Generate Comparison")
                     .fontWeight(.semibold)
             }
             .frame(maxWidth: .infinity)
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill((viewModel.canGenerate && apiKeyManager.hasValidAPIKey) ? AppColors.primary : AppColors.separator)
+                    .fill((store.canGenerate && store.hasValidAPIKey) ? AppColors.primary : AppColors.separator)
             )
-            .foregroundColor((viewModel.canGenerate && apiKeyManager.hasValidAPIKey) ? .white : .gray)
+            .foregroundColor((store.canGenerate && store.hasValidAPIKey) ? .white : .gray)
         }
-        .disabled(!viewModel.canGenerate || viewModel.isLoading || !apiKeyManager.hasValidAPIKey)
+        .disabled(!store.canGenerate || !store.hasValidAPIKey)
     }
     
     private var recentComparisonsList: some View {
         Group {
-            if !viewModel.recentComparisons.isEmpty {
+            if !store.recentComparisons.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     Label("Recent Comparisons", systemImage: "clock.arrow.circlepath")
                         .font(.headline)
                     
                     LazyVStack(spacing: 8) {
-                        ForEach(viewModel.recentComparisons.indices, id: \.self) { index in
-                            RecentComparisonRow(comparison: viewModel.recentComparisons[index]) {
-                                viewModel.loadRecentComparison(at: index)
+                        ForEach(store.recentComparisons) { comparison in
+                            RecentComparisonRow(comparison: comparison) {
+                                store.send(.loadRecentComparison(comparison.id))
                             }
                         }
                     }
@@ -187,9 +185,11 @@ struct WordComparatorMainView: View {
     }
 }
 
-
-
-
 #Preview {
-    WordComparatorMainView()
+    WordComparatorMainView(
+        store: Store(initialState: WordComparatorFeature.State()) {
+            WordComparatorFeature()
+        }
+    )
 }
+

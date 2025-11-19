@@ -6,13 +6,19 @@
 //
 
 import SwiftUI
+import ComposableArchitecture
 
 @main
 struct EnglishWordComparatorApp: App {
     var body: some Scene {
         WindowGroup {
-            WordComparatorMainView()
+            WordComparatorMainView(
+                store: Store(initialState: WordComparatorFeature.State()) {
+                    WordComparatorFeature()
+                }
+            )
         }
     }
 }
+
 

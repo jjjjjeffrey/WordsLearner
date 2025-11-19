@@ -5,63 +5,57 @@
 //  Created by Jeffrey on 11/13/25.
 //
 
+import ComposableArchitecture
 import SwiftUI
 
 struct ResponseDetailView: View {
-    @ObservedObject var viewModel: WordComparatorViewModel
+    let store: StoreOf<ResponseDetailFeature>
     
     var body: some View {
-            NavigationStack {
-                VStack(spacing: 0) {
-                    headerSection
-                    
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 16) {
-                                comparisonInfoCard
-                                streamingResponseView
-                                Spacer(minLength: 100) // Bottom padding
-                            }
-                            .padding()
-                        }
-                        .onChange(of: viewModel.streamingResponse) { _ in
-                            // Auto-scroll to bottom as content is being streamed
-                            withAnimation(.easeOut(duration: 0.3)) {
-                                proxy.scrollTo("bottom", anchor: .bottom)
-                            }
-                        }
+        VStack(spacing: 0) {
+            headerSection
+            
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        comparisonInfoCard
+                        streamingResponseView
+                        Spacer(minLength: 100)
+                    }
+                    .padding()
+                }
+                .onChange(of: store.streamingResponse) { _ in
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        proxy.scrollTo("bottom", anchor: .bottom)
                     }
                 }
             }
-            .navigationTitle("Comparison Result")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    shareButton
-                }
-                #else
-                ToolbarItem(placement: .primaryAction) {
-                    shareButton
-                }
-                #endif
-            }
-            .onAppear {
-                if viewModel.shouldStartStreaming {
-                    viewModel.startStreamingComparison()
-                }
-            }
         }
+        .navigationTitle("Comparison Result")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            #if os(iOS)
+            ToolbarItem(placement: .navigationBarTrailing) {
+                shareButton
+            }
+            #else
+            ToolbarItem(placement: .primaryAction) {
+                shareButton
+            }
+            #endif
+        }
+        .onAppear {
+            store.send(.onAppear)
+        }
+    }
     
     private var headerSection: some View {
         VStack(spacing: 0) {
-            // Words comparison row
             HStack(spacing: 0) {
-                // First Word Section
                 VStack(spacing: 6) {
-                    Text(viewModel.word1)
+                    Text(store.word1)
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.blue)
@@ -73,12 +67,8 @@ struct ResponseDetailView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.blue.opacity(0.1))
-                )
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.1)))
                 
-                // VS Divider
                 VStack {
                     Image(systemName: "arrow.left.and.right")
                         .font(.title3)
@@ -90,9 +80,8 @@ struct ResponseDetailView: View {
                 }
                 .frame(width: 50)
                 
-                // Second Word Section
                 VStack(spacing: 6) {
-                    Text(viewModel.word2)
+                    Text(store.word2)
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.green)
@@ -104,22 +93,16 @@ struct ResponseDetailView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.green.opacity(0.1))
-                )
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.green.opacity(0.1)))
             }
             .padding(.horizontal)
             .padding(.top)
             
-            // Progress indicator
-            if viewModel.isStreaming {
+            if store.isStreaming {
                 VStack(spacing: 8) {
                     Divider()
-                    
                     HStack {
-                        ProgressView()
-                            .scaleEffect(0.8)
+                        ProgressView().scaleEffect(0.8)
                         Text("Generating comparison...")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -128,23 +111,19 @@ struct ResponseDetailView: View {
                 }
                 .padding(.horizontal)
             } else {
-                // Add some bottom padding when not streaming
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(height: 8)
+                Rectangle().fill(Color.clear).frame(height: 8)
             }
         }
         .frame(maxWidth: .infinity)
         .background(AppColors.secondaryBackground)
     }
-
     
     private var comparisonInfoCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Context Sentence", systemImage: "quote.bubble")
                 .font(.headline)
             
-            Text(viewModel.sentence)
+            Text(store.sentence)
                 .font(.body)
                 .padding()
                 .background(
@@ -159,14 +138,14 @@ struct ResponseDetailView: View {
             Label("AI Analysis", systemImage: "brain.head.profile")
                 .font(.headline)
             
-            if viewModel.streamingResponse.isEmpty && !viewModel.isStreaming {
+            if store.streamingResponse.isEmpty && !store.isStreaming {
                 ContentUnavailableView(
                     "No Response Yet",
                     systemImage: "text.bubble",
                     description: Text("The AI analysis will appear here")
                 )
             } else {
-                MarkdownText(viewModel.streamingResponse)
+                MarkdownText(store.streamingResponse)
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
@@ -175,62 +154,41 @@ struct ResponseDetailView: View {
                     )
             }
             
-            // Invisible anchor for auto-scrolling
-            Color.clear
-                .frame(height: 1)
-                .id("bottom")
+            if let errorMessage = store.errorMessage {
+                Text(errorMessage)
+                    .foregroundColor(.red)
+                    .padding()
+            }
+            
+            Color.clear.frame(height: 1).id("bottom")
         }
     }
     
     private var shareButton: some View {
-            Button(action: shareComparison) {
-                Image(systemName: "square.and.arrow.up")
-            }
-            .disabled(viewModel.streamingResponse.isEmpty)
+        Button {
+            store.send(.shareButtonTapped)
+        } label: {
+            Image(systemName: "square.and.arrow.up")
         }
-        
-        private func shareComparison() {
-            let shareText = """
-            Word Comparison: \(viewModel.word1) vs \(viewModel.word2)
-            
-            Context: \(viewModel.sentence)
-            
-            Analysis:
-            \(viewModel.streamingResponse)
-            """
-            
-            #if os(iOS)
-            shareOnIOS(text: shareText)
-            #else
-            shareOnMacOS(text: shareText)
-            #endif
-        }
-        
-        #if os(iOS)
-        private func shareOnIOS(text: String) {
-            let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
-            
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let window = windowScene.windows.first {
-                window.rootViewController?.present(activityVC, animated: true)
-            }
-        }
-        #endif
-        
-        #if os(macOS)
-        private func shareOnMacOS(text: String) {
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.setString(text, forType: .string)
-            
-            // 可以选择显示一个通知或者弹窗告诉用户内容已复制
-            // 这里我们可以添加一个简单的通知
-            DispatchQueue.main.async {
-                // 你可以在这里添加一个 toast 通知或者其他反馈
-                print("Content copied to clipboard")
-            }
-        }
-        #endif
+        .disabled(store.streamingResponse.isEmpty)
+    }
 }
+
+#Preview {
+    NavigationStack {
+        ResponseDetailView(
+            store: Store(
+                initialState: ResponseDetailFeature.State(
+                    word1: "character",
+                    word2: "characteristic",
+                    sentence: "This is a test sentence."
+                )
+            ) {
+                ResponseDetailFeature()
+            }
+        )
+    }
+}
+
 
 
