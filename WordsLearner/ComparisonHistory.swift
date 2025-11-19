@@ -6,9 +6,11 @@
 //
 
 import Foundation
+import SQLiteData
 
+@Table
 struct ComparisonHistory: Identifiable, Codable, Equatable {
-    let id = UUID()
+    let id: UUID
     let word1: String
     let word2: String
     let sentence: String

@@ -74,6 +74,7 @@ struct ResponseDetailFeature {
                 state.isStreaming = false
                 
                 let comparison = ComparisonHistory(
+                    id: .init(),
                     word1: state.word1,
                     word2: state.word2,
                     sentence: state.sentence,

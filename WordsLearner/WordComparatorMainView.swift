@@ -172,10 +172,13 @@ struct WordComparatorMainView: View {
                         .font(.headline)
                     
                     LazyVStack(spacing: 8) {
-                        ForEach(store.recentComparisons) { comparison in
+                        ForEach(Array(store.recentComparisons.enumerated()), id: \.element.id) { index, comparison in
                             RecentComparisonRow(comparison: comparison) {
                                 store.send(.loadRecentComparison(comparison.id))
                             }
+                        }
+                        .onDelete { indexSet in
+                            store.send(.deleteComparisons(indexSet))
                         }
                     }
                 }
@@ -186,10 +189,13 @@ struct WordComparatorMainView: View {
 }
 
 #Preview {
+    let _ = prepareDependencies {
+        $0.database = .testDatabase
+    }
+    
     WordComparatorMainView(
         store: Store(initialState: WordComparatorFeature.State()) {
             WordComparatorFeature()
         }
     )
 }
-

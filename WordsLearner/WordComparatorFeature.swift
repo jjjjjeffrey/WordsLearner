@@ -7,6 +7,7 @@
 
 import ComposableArchitecture
 import Foundation
+import SQLiteData
 
 @Reducer
 struct WordComparatorFeature {
@@ -22,7 +23,7 @@ struct WordComparatorFeature {
         var word1: String = ""
         var word2: String = ""
         var sentence: String = ""
-        var recentComparisons: IdentifiedArrayOf<ComparisonHistory> = []
+        var recentComparisons: [ComparisonHistory] = []
         var hasValidAPIKey: Bool = false
         
         @Presents var destination: Destination.State?
@@ -41,11 +42,13 @@ struct WordComparatorFeature {
         case settingsButtonTapped
         case loadRecentComparison(UUID)
         case destination(PresentationAction<Destination.Action>)
-        case recentComparisonsLoaded(IdentifiedArrayOf<ComparisonHistory>)
+        case recentComparisonsLoaded([ComparisonHistory])
         case apiKeyStatusChanged(Bool)
+        case deleteComparisons(IndexSet)
     }
     
     @Dependency(\.apiKeyManager) var apiKeyManager
+    @Dependency(\.database) var database
     
     var body: some Reducer<State, Action> {
         BindingReducer()
@@ -55,8 +58,15 @@ struct WordComparatorFeature {
             case .onAppear:
                 state.hasValidAPIKey = apiKeyManager.hasValidAPIKey()
                 return .run { send in
-                    let comparisons = loadRecentComparisonsFromUserDefaults()
+                    // Load recent comparisons from database
+                    let comparisons = try await loadRecentComparisons()
                     await send(.recentComparisonsLoaded(comparisons))
+                    
+                    // Optional: Migrate from UserDefaults on first launch
+                    #if DEBUG
+                    // You can manually trigger migration if needed
+                    // try? database.migrateFromUserDefaults()
+                    #endif
                 }
                 
             case .settingsButtonTapped:
@@ -76,7 +86,8 @@ struct WordComparatorFeature {
                 return .none
                 
             case let .loadRecentComparison(id):
-                guard let comparison = state.recentComparisons[id: id] else { return .none }
+                guard let comparison = state.recentComparisons.first(where: { $0.id == id })
+                else { return .none }
                 
                 state.word1 = comparison.word1
                 state.word2 = comparison.word2
@@ -100,13 +111,19 @@ struct WordComparatorFeature {
                 state.hasValidAPIKey = hasKey
                 return .none
                 
-            case let .destination(.presented(.detail(.delegate(.comparisonCompleted(comparison))))):
-                state.recentComparisons.insert(comparison, at: 0)
-                if state.recentComparisons.count > 10 {
-                    state.recentComparisons.removeLast()
+            case let .deleteComparisons(indexSet):
+                return .run { [comparisons = state.recentComparisons] send in
+                    try await deleteComparisons(at: indexSet, from: comparisons)
+                    let updatedComparisons = try await loadRecentComparisons()
+                    await send(.recentComparisonsLoaded(updatedComparisons))
                 }
-                return .run { [recentComparisons = state.recentComparisons] send in
-                    saveRecentComparisonsToUserDefaults(recentComparisons)
+                
+            case let .destination(.presented(.detail(.delegate(.comparisonCompleted(comparison))))):
+                // Save to database
+                return .run { send in
+                    try await saveComparison(comparison)
+                    let comparisons = try await loadRecentComparisons()
+                    await send(.recentComparisonsLoaded(comparisons))
                 }
                 
             case .destination(.presented(.settings(.delegate(.apiKeyChanged)))):
@@ -122,25 +139,43 @@ struct WordComparatorFeature {
         }
         .ifLet(\.$destination, action: \.destination)
     }
+    
+    // MARK: - Database Operations
+    
+    private func loadRecentComparisons() async throws -> [ComparisonHistory] {
+        try await database.read { db in
+            try ComparisonHistory
+                .order { $0.date.desc() }
+                .limit(10)
+                .fetchAll(db)
+        }
+    }
+    
+    private func saveComparison(_ comparison: ComparisonHistory) async throws {
+        try await database.write { db in
+            try ComparisonHistory.insert {
+                ComparisonHistory.Draft(
+                    id: comparison.id,
+                    word1: comparison.word1,
+                    word2: comparison.word2,
+                    sentence: comparison.sentence,
+                    response: comparison.response,
+                    date: comparison.date
+                )
+            }
+            .execute(db)
+        }
+    }
+    
+    private func deleteComparisons(at indexSet: IndexSet, from comparisons: [ComparisonHistory]) async throws {
+        try await database.write { db in
+            let ids = indexSet.map { comparisons[$0].id }
+            try ComparisonHistory
+                .where { $0.id.in(ids) }
+                .delete()
+                .execute(db)
+        }
+    }
 }
 
 extension WordComparatorFeature.Destination.State: Equatable {}
-
-// MARK: - Helper Functions
-
-private func loadRecentComparisonsFromUserDefaults() -> IdentifiedArrayOf<ComparisonHistory> {
-    if let data = UserDefaults.standard.data(forKey: "RecentComparisons"),
-       let comparisons = try? JSONDecoder().decode(IdentifiedArrayOf<ComparisonHistory>.self, from: data) {
-        return comparisons
-    }
-    return []
-}
-
-private func saveRecentComparisonsToUserDefaults(_ comparisons: IdentifiedArrayOf<ComparisonHistory>) {
-    if let data = try? JSONEncoder().encode(comparisons) {
-        UserDefaults.standard.set(data, forKey: "RecentComparisons")
-    }
-}
-
-
-

@@ -10,6 +10,10 @@ import ComposableArchitecture
 
 @main
 struct EnglishWordComparatorApp: App {
+    init() {
+        // Database is automatically initialized through dependency system
+    }
+    
     var body: some Scene {
         WindowGroup {
             WordComparatorMainView(
@@ -20,5 +24,3 @@ struct EnglishWordComparatorApp: App {
         }
     }
 }
-
-
