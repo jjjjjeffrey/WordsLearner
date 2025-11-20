@@ -155,7 +155,6 @@ struct WordComparatorFeature {
         try await database.write { db in
             try ComparisonHistory.insert {
                 ComparisonHistory.Draft(
-                    id: comparison.id,
                     word1: comparison.word1,
                     word2: comparison.word2,
                     sentence: comparison.sentence,

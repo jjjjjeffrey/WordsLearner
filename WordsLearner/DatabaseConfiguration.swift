@@ -70,7 +70,7 @@ private func createAppDatabase() throws -> DatabaseQueue {
         try #sql(
             """
             CREATE TABLE "comparisonHistories" (
-                "id" TEXT PRIMARY KEY NOT NULL,
+                "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
                 "word1" TEXT NOT NULL,
                 "word2" TEXT NOT NULL,
                 "sentence" TEXT NOT NULL,
