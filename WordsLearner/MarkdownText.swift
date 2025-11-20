@@ -8,6 +8,7 @@
 import SwiftUI
 import Markdown
 
+
 struct MarkdownText: View {
     let content: String
     @State private var attributedString: AttributedString = AttributedString()
@@ -43,13 +44,21 @@ struct MarkdownText: View {
     }
 }
 
-// Fixed renderer for AttributedString
 struct AttributedStringRenderer {
+    
+    #if os(macOS)
+    private let baseFontSize: CGFloat = 18
+    private let headingScale: CGFloat = 1.2
+    #else
+    private let baseFontSize: CGFloat = 16
+    private let headingScale: CGFloat = 1.0
+    #endif
+    
     func render(_ document: Document) -> AttributedString {
         var result = AttributedString()
         
         for child in document.children {
-            result.append(renderMarkup(child)) // Changed from renderBlock
+            result.append(renderMarkup(child))
         }
         
         return result
@@ -101,19 +110,34 @@ struct AttributedStringRenderer {
             result.append(renderMarkup(child))
         }
         
-        // Apply heading styles based on level
         switch heading.level {
         case 1:
+            #if os(macOS)
+            result.font = .system(size: 28 * headingScale, weight: .bold)
+            #else
             result.font = .title.bold()
+            #endif
             result.foregroundColor = .primary
         case 2:
+            #if os(macOS)
+            result.font = .system(size: 22 * headingScale, weight: .bold)
+            #else
             result.font = .title2.bold()
+            #endif
             result.foregroundColor = .primary
         case 3:
+            #if os(macOS)
+            result.font = .system(size: 18 * headingScale, weight: .bold)
+            #else
             result.font = .title3.bold()
+            #endif
             result.foregroundColor = .primary
         default:
+            #if os(macOS)
+            result.font = .system(size: 16 * headingScale, weight: .semibold)
+            #else
             result.font = .headline.bold()
+            #endif
             result.foregroundColor = .primary
         }
         
@@ -128,6 +152,12 @@ struct AttributedStringRenderer {
             result.append(renderMarkup(child))
         }
         
+        #if os(macOS)
+        result.font = .system(size: baseFontSize)
+        #else
+        result.font = .body
+        #endif
+        
         result.append(AttributedString("\n\n"))
         return result
     }
@@ -138,14 +168,21 @@ struct AttributedStringRenderer {
         for (index, item) in list.children.enumerated() {
             if let listItem = item as? ListItem {
                 var itemText = AttributedString("\(index + 1). ")
+                #if os(macOS)
+                itemText.font = .system(size: baseFontSize, weight: .bold)
+                #else
                 itemText.font = .body.bold()
+                #endif
                 
                 for child in listItem.children {
-                    itemText.append(renderMarkup(child))
+                    var childText = renderMarkup(child)
+                    #if os(macOS)
+                    childText.font = .system(size: baseFontSize)
+                    #endif
+                    itemText.append(childText)
                 }
                 
                 result.append(itemText)
-                result.append(AttributedString("\n"))
             }
         }
         
@@ -159,14 +196,21 @@ struct AttributedStringRenderer {
         for item in list.children {
             if let listItem = item as? ListItem {
                 var itemText = AttributedString("• ")
+                #if os(macOS)
+                itemText.font = .system(size: baseFontSize, weight: .bold)
+                #else
                 itemText.font = .body.bold()
+                #endif
                 
                 for child in listItem.children {
-                    itemText.append(renderMarkup(child))
+                    var childText = renderMarkup(child)
+                    #if os(macOS)
+                    childText.font = .system(size: baseFontSize)
+                    #endif
+                    itemText.append(childText)
                 }
                 
                 result.append(itemText)
-                result.append(AttributedString("\n"))
             }
         }
         
@@ -186,7 +230,11 @@ struct AttributedStringRenderer {
     
     private func renderCodeBlock(_ codeBlock: CodeBlock) -> AttributedString {
         var result = AttributedString(codeBlock.code)
+        #if os(macOS)
+        result.font = .system(size: baseFontSize - 1, design: .monospaced)
+        #else
         result.font = .system(.body, design: .monospaced)
+        #endif
         result.backgroundColor = AppColors.fieldBackground
         result.append(AttributedString("\n\n"))
         return result
@@ -199,7 +247,11 @@ struct AttributedStringRenderer {
             result.append(renderMarkup(child))
         }
         
+        #if os(macOS)
+        result.font = .system(size: baseFontSize, design: .default).italic()
+        #else
         result.font = .body.italic()
+        #endif
         result.foregroundColor = .secondary
         result.append(AttributedString("\n\n"))
         return result
@@ -214,7 +266,11 @@ struct AttributedStringRenderer {
             result.append(renderMarkup(child))
         }
         
+        #if os(macOS)
+        result.font = .system(size: baseFontSize, weight: .bold)
+        #else
         result.font = .body.bold()
+        #endif
         return result
     }
     
@@ -225,13 +281,21 @@ struct AttributedStringRenderer {
             result.append(renderMarkup(child))
         }
         
+        #if os(macOS)
+        result.font = .system(size: baseFontSize, design: .default).italic()
+        #else
         result.font = .body.italic()
+        #endif
         return result
     }
     
     private func renderInlineCode(_ inlineCode: InlineCode) -> AttributedString {
         var result = AttributedString(inlineCode.code)
+        #if os(macOS)
+        result.font = .system(size: baseFontSize - 1, design: .monospaced)
+        #else
         result.font = .system(.body, design: .monospaced)
+        #endif
         result.backgroundColor = AppColors.fieldBackground
         return result
     }
@@ -253,6 +317,3 @@ struct AttributedStringRenderer {
         return result
     }
 }
-
-
-
