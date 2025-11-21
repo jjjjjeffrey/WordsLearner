@@ -25,6 +25,9 @@ struct WordComparatorMainView: View {
                     inputFieldsView
                     generateButtonView
                     
+                    // Add header with "View All" button
+                    recentComparisonsHeader
+                    
                     RecentComparisonsView(
                         store: store.scope(
                             state: \.recentComparisons,
@@ -57,12 +60,40 @@ struct WordComparatorMainView: View {
             ) { detailStore in
                 ResponseDetailView(store: detailStore)
             }
+            .navigationDestination(
+                store: store.scope(state: \.$destination.historyList, action: \.destination.historyList)
+            ) { store in
+                ComparisonHistoryListView(store: store)
+            }
             .sheet(
                 item: $store.scope(state: \.destination?.settings, action: \.destination.settings)
             ) { settingsStore in
                 SettingsView(store: settingsStore)
             }
         }
+    }
+    
+    // Add this new view
+    private var recentComparisonsHeader: some View {
+        HStack {
+            Label("Recent Comparisons", systemImage: "clock.arrow.circlepath")
+                .font(.headline)
+            
+            Spacer()
+            
+            Button {
+                store.send(.historyListButtonTapped)
+            } label: {
+                HStack(spacing: 4) {
+                    Text("View All")
+                        .font(.subheadline)
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                }
+                .foregroundColor(AppColors.primary)
+            }
+        }
+        .padding(.horizontal, 4)
     }
     
     private var settingsButton: some View {

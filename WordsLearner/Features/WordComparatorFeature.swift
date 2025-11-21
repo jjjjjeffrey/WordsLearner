@@ -16,6 +16,7 @@ struct WordComparatorFeature {
     enum Destination {
         case detail(ResponseDetailFeature)
         case settings(SettingsFeature)
+        case historyList(ComparisonHistoryListFeature)
     }
     
     @ObservableState
@@ -41,6 +42,7 @@ struct WordComparatorFeature {
         case onAppear
         case generateButtonTapped
         case settingsButtonTapped
+        case historyListButtonTapped
         case destination(PresentationAction<Destination.Action>)
         case apiKeyStatusChanged(Bool)
         case recentComparisons(RecentComparisonsFeature.Action)
@@ -86,6 +88,26 @@ struct WordComparatorFeature {
                 state.hasValidAPIKey = apiKeyManager.hasValidAPIKey()
                 return .none
             case let .recentComparisons(.delegate(.comparisonSelected(comparison))):
+                state.word1 = comparison.word1
+                state.word2 = comparison.word2
+                state.sentence = comparison.sentence
+                state.destination = .detail(
+                    ResponseDetailFeature.State(
+                        word1: comparison.word1,
+                        word2: comparison.word2,
+                        sentence: comparison.sentence,
+                        streamingResponse: comparison.response,
+                        shouldStartStreaming: false
+                    )
+                )
+                return .none
+                // Add this new case
+            case .historyListButtonTapped:
+                state.destination = .historyList(ComparisonHistoryListFeature.State())
+                return .none
+                
+                // Add handler for history list delegate
+            case let .destination(.presented(.historyList(.delegate(.comparisonSelected(comparison))))):
                 state.word1 = comparison.word1
                 state.word2 = comparison.word2
                 state.sentence = comparison.sentence
