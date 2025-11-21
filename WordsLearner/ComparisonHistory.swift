@@ -9,11 +9,13 @@ import Foundation
 import SQLiteData
 
 @Table
-struct ComparisonHistory: Identifiable, Codable, Equatable {
+nonisolated struct ComparisonHistory: Identifiable, Equatable {
     let id: UUID
-    let word1: String
-    let word2: String
-    let sentence: String
-    let response: String
-    let date: Date
+    var word1: String
+    var word2: String
+    var sentence: String
+    var response: String
+    var date: Date
 }
+
+extension ComparisonHistory.Draft: Identifiable {}

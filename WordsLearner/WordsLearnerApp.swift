@@ -11,7 +11,10 @@ import ComposableArchitecture
 @main
 struct EnglishWordComparatorApp: App {
     init() {
-        // Database is automatically initialized through dependency system
+        // Bootstrap database on app launch
+        try! prepareDependencies {
+            try $0.bootstrapDatabase()
+        }
     }
     
     var body: some Scene {

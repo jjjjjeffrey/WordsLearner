@@ -7,6 +7,7 @@
 
 import ComposableArchitecture
 import Foundation
+import SQLiteData
 
 @Reducer
 struct ResponseDetailFeature {
@@ -28,15 +29,13 @@ struct ResponseDetailFeature {
         case streamCompleted
         case streamFailed(Error)
         case shareButtonTapped
-        case delegate(Delegate)
-        
-        enum Delegate: Equatable {
-            case comparisonCompleted(ComparisonHistory)
-        }
+        case comparisonSaved
+        case comparisonSaveFailed(Error)
     }
     
     @Dependency(\.aiService) var aiService
     @Dependency(\.date.now) var now
+    @Dependency(\.defaultDatabase) var database
     
     var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -72,17 +71,33 @@ struct ResponseDetailFeature {
                 
             case .streamCompleted:
                 state.isStreaming = false
-                
-                let comparison = ComparisonHistory(
-                    id: .init(),
+                let draft = ComparisonHistory.Draft(
                     word1: state.word1,
                     word2: state.word2,
                     sentence: state.sentence,
                     response: state.streamingResponse,
                     date: now
                 )
+                return .run { send in
+                    do {
+                        try await database.write { db in
+                            try ComparisonHistory.insert {
+                                draft
+                            }
+                            .execute(db)
+                        }
+                        await send(.comparisonSaved)
+                    } catch {
+                        await send(.comparisonSaveFailed(error))
+                    }
+                }
                 
-                return .send(.delegate(.comparisonCompleted(comparison)))
+            case .comparisonSaved:
+                return .none
+                
+            case let .comparisonSaveFailed(error):
+                state.errorMessage = "Failed to save comparison: \(error.localizedDescription)"
+                return .none
                 
             case let .streamFailed(error):
                 state.isStreaming = false
@@ -100,9 +115,6 @@ struct ResponseDetailFeature {
                 """
                 
                 PlatformShareService.share(text: shareText)
-                return .none
-                
-            case .delegate:
                 return .none
             }
         }
@@ -131,4 +143,3 @@ private func buildPrompt(word1: String, word2: String, sentence: String) -> Stri
     - Use - for bullet points when appropriate
     """
 }
-

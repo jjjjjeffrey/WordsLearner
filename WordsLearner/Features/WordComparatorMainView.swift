@@ -7,6 +7,7 @@
 
 import ComposableArchitecture
 import SwiftUI
+import SQLiteData
 
 struct WordComparatorMainView: View {
     @Bindable var store: StoreOf<WordComparatorFeature>
@@ -23,7 +24,13 @@ struct WordComparatorMainView: View {
                     
                     inputFieldsView
                     generateButtonView
-                    recentComparisonsList
+                    
+                    RecentComparisonsView(
+                        store: store.scope(
+                            state: \.recentComparisons,
+                            action: \.recentComparisons
+                        )
+                    )
                 }
                 .padding()
             }
@@ -163,34 +170,11 @@ struct WordComparatorMainView: View {
         }
         .disabled(!store.canGenerate || !store.hasValidAPIKey)
     }
-    
-    private var recentComparisonsList: some View {
-        Group {
-            if !store.recentComparisons.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    Label("Recent Comparisons", systemImage: "clock.arrow.circlepath")
-                        .font(.headline)
-                    
-                    LazyVStack(spacing: 8) {
-                        ForEach(Array(store.recentComparisons.enumerated()), id: \.element.id) { index, comparison in
-                            RecentComparisonRow(comparison: comparison) {
-                                store.send(.loadRecentComparison(comparison.id))
-                            }
-                        }
-                        .onDelete { indexSet in
-                            store.send(.deleteComparisons(indexSet))
-                        }
-                    }
-                }
-                .padding(.top)
-            }
-        }
-    }
 }
 
 #Preview {
     let _ = prepareDependencies {
-        $0.database = .testDatabase
+        $0.defaultDatabase = .testDatabase
     }
     
     WordComparatorMainView(
@@ -199,3 +183,4 @@ struct WordComparatorMainView: View {
         }
     )
 }
+

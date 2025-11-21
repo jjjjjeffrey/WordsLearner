@@ -5,63 +5,62 @@
 //  Created by Jeffrey on 11/19/25.
 //
 
+import Dependencies
 import Foundation
-import SQLiteData
-import ComposableArchitecture
+import IssueReporting
 import OSLog
+import SQLiteData
 
 private let logger = Logger(subsystem: "WordsLearner", category: "Database")
 
 extension DependencyValues {
-    var database: DatabaseWriter {
-        get { self[DatabaseKey.self] }
-        set { self[DatabaseKey.self] = newValue }
+    /// Bootstrap the app database
+    mutating func bootstrapDatabase() throws {
+        @Dependency(\.context) var context
+        
+        let database = try createAppDatabase()
+        
+        logger.debug(
+            """
+            App database:
+            open "\(database.path)"
+            """
+        )
+        
+        defaultDatabase = database
+        
+        // Optional: Configure sync engine for CloudKit
+        // defaultSyncEngine = try SyncEngine(
+        //     for: defaultDatabase,
+        //     tables: ComparisonHistory.self
+        // )
     }
 }
 
-private enum DatabaseKey: DependencyKey {
-    static let liveValue: DatabaseWriter = {
-        do {
-            let database = try createAppDatabase()
-            logger.info("✅ Database initialized at: \(database.path)")
-            return database
-        } catch {
-            logger.error("❌ Failed to initialize database: \(error)")
-            fatalError("Failed to initialize database: \(error)")
-        }
-    }()
-    
-    static let testValue: DatabaseWriter = {
-        try! DatabaseQueue()
-    }()
-}
-
 /// Creates and configures the app database
-private func createAppDatabase() throws -> DatabaseQueue {
-    // Get application support directory
-    let fileManager = FileManager.default
-    let appSupportURL = try fileManager.url(
-        for: .applicationSupportDirectory,
-        in: .userDomainMask,
-        appropriateFor: nil,
-        create: true
-    )
+private func createAppDatabase() throws -> any DatabaseWriter {
+    @Dependency(\.context) var context
     
-    // Create app-specific directory
-    let appDirectory = appSupportURL.appendingPathComponent("WordsLearner", isDirectory: true)
-    try fileManager.createDirectory(at: appDirectory, withIntermediateDirectories: true)
+    var configuration = Configuration()
+    configuration.foreignKeysEnabled = true
     
-    // Database file path
-    let databaseURL = appDirectory.appendingPathComponent("comparisons.sqlite")
+    #if DEBUG
+    configuration.prepareDatabase { db in
+        db.trace(options: .profile) { event in
+            if context == .live {
+                logger.debug("\(event.expandedDescription)")
+            } else {
+                print("\(event.expandedDescription)")
+            }
+        }
+    }
+    #endif
     
-    // Create database
-    let databaseQueue = try DatabaseQueue(path: databaseURL.path)
+    let database = try SQLiteData.defaultDatabase(configuration: configuration)
     
-    // Run migrations
     var migrator = DatabaseMigrator()
     
     #if DEBUG
-    // Erase database on schema change during development
     migrator.eraseDatabaseOnSchemaChange = true
     #endif
     
@@ -71,11 +70,11 @@ private func createAppDatabase() throws -> DatabaseQueue {
             """
             CREATE TABLE "comparisonHistories" (
                 "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
-                "word1" TEXT NOT NULL,
-                "word2" TEXT NOT NULL,
-                "sentence" TEXT NOT NULL,
-                "response" TEXT NOT NULL,
-                "date" TEXT NOT NULL
+                "word1" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "word2" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "sentence" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "response" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "date" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP
             ) STRICT
             """
         )
@@ -89,83 +88,180 @@ private func createAppDatabase() throws -> DatabaseQueue {
             """
         )
         .execute(db)
+        
+        // Create index for word searches
+        try #sql(
+            """
+            CREATE INDEX "idx_comparisonHistories_words" 
+            ON "comparisonHistories" ("word1", "word2")
+            """
+        )
+        .execute(db)
+    }
+    
+    // Optional: Create Full-Text Search table for advanced search
+    migrator.registerMigration("v1.1 - Create FTS table") { db in
+        try #sql(
+            """
+            CREATE VIRTUAL TABLE "comparisonHistories_fts" USING fts5(
+                "word1",
+                "word2",
+                "sentence",
+                "response",
+                content="comparisonHistories",
+                content_rowid="rowid"
+            )
+            """
+        )
+        .execute(db)
+        
+        // Create triggers to keep FTS in sync
+        try ComparisonHistory.createTemporaryTrigger(
+            after: .insert { new in
+                #sql(
+                    """
+                    INSERT INTO comparisonHistories_fts(rowid, word1, word2, sentence, response)
+                    VALUES (\(new.rowid), \(new.word1), \(new.word2), \(new.sentence), \(new.response))
+                    """
+                )
+            }
+        )
+        .execute(db)
+        
+        try ComparisonHistory.createTemporaryTrigger(
+            after: .update { ($0.word1, $0.word2, $0.sentence, $0.response) }
+            forEachRow: { _, new in
+                #sql(
+                    """
+                    UPDATE comparisonHistories_fts 
+                    SET word1 = \(new.word1), 
+                        word2 = \(new.word2), 
+                        sentence = \(new.sentence), 
+                        response = \(new.response)
+                    WHERE rowid = \(new.rowid)
+                    """
+                )
+            }
+        )
+        .execute(db)
+        
+        try ComparisonHistory.createTemporaryTrigger(
+            after: .delete { old in
+                #sql("DELETE FROM comparisonHistories_fts WHERE rowid = \(old.rowid)")
+            }
+        )
+        .execute(db)
     }
     
     // Future migrations can be added here
-    // migrator.registerMigration("v1.1 - Add new column") { db in ... }
+    // migrator.registerMigration("v1.2 - Add favorites") { db in ... }
     
-    try migrator.migrate(databaseQueue)
+    try migrator.migrate(database)
     
-    return databaseQueue
+    // Optional: Migrate from UserDefaults on first launch
+    #if !DEBUG
+    try migrateFromUserDefaultsIfNeeded(database)
+    #endif
+    
+    return database
 }
 
-// MARK: - Database Operations Helper
-
-extension DatabaseWriter where Self == DatabaseQueue {
-    /// Test database for previews and tests
-    static var testDatabase: Self {
-        let database = try! DatabaseQueue()
-        var migrator = DatabaseMigrator()
-        migrator.registerMigration("Create test table") { db in
-            try #sql(
-                """
-                CREATE TABLE "comparisonHistories" (
-                    "id" TEXT PRIMARY KEY NOT NULL,
-                    "word1" TEXT NOT NULL,
-                    "word2" TEXT NOT NULL,
-                    "sentence" TEXT NOT NULL,
-                    "response" TEXT NOT NULL,
-                    "date" TEXT NOT NULL
-                ) STRICT
-                """
-            )
+/// Migrate legacy data from UserDefaults to SQLite (one-time migration)
+private func migrateFromUserDefaultsIfNeeded(_ database: any DatabaseWriter) throws {
+    let migrationKey = "DidMigrateToSQLite_v1"
+    
+    guard !UserDefaults.standard.bool(forKey: migrationKey) else {
+        logger.info("Already migrated from UserDefaults")
+        return
+    }
+    
+    guard let data = UserDefaults.standard.data(forKey: "RecentComparisons"),
+          let oldComparisons = try? JSONDecoder().decode([LegacyComparisonHistory].self, from: data)
+    else {
+        logger.info("No legacy data to migrate")
+        UserDefaults.standard.set(true, forKey: migrationKey)
+        return
+    }
+    
+    try database.write { db in
+        for comparison in oldComparisons {
+            try ComparisonHistory.insert {
+                ComparisonHistory.Draft(
+                    id: comparison.id,
+                    word1: comparison.word1,
+                    word2: comparison.word2,
+                    sentence: comparison.sentence,
+                    response: comparison.response,
+                    date: comparison.date
+                )
+            }
             .execute(db)
         }
-        try! migrator.migrate(database)
-        return database
     }
-}
-
-// MARK: - Migration Helper (Optional)
-
-extension DatabaseWriter where Self == DatabaseQueue {
-    /// Migrate data from UserDefaults to SQLite (run once)
-    func migrateFromUserDefaults() throws {
-        guard let data = UserDefaults.standard.data(forKey: "RecentComparisons"),
-              let oldComparisons = try? JSONDecoder().decode([ComparisonHistoryLegacy].self, from: data)
-        else {
-            logger.info("No legacy data to migrate")
-            return
-        }
-        
-        try write { db in
-            for comparison in oldComparisons {
-                try ComparisonHistory.insert {
-                    ComparisonHistory.Draft(
-                        id: comparison.id,
-                        word1: comparison.word1,
-                        word2: comparison.word2,
-                        sentence: comparison.sentence,
-                        response: comparison.response,
-                        date: comparison.date
-                    )
-                }
-                .execute(db)
-            }
-        }
-        
-        // Remove old data after successful migration
-        UserDefaults.standard.removeObject(forKey: "RecentComparisons")
-        logger.info("✅ Migrated \(oldComparisons.count) records from UserDefaults")
-    }
+    
+    // Mark migration as complete and clean up
+    UserDefaults.standard.set(true, forKey: migrationKey)
+    UserDefaults.standard.removeObject(forKey: "RecentComparisons")
+    
+    logger.info("✅ Migrated \(oldComparisons.count) records from UserDefaults")
 }
 
 // Legacy model for migration
-private struct ComparisonHistoryLegacy: Codable {
+private struct LegacyComparisonHistory: Codable {
     let id: UUID
     let word1: String
     let word2: String
     let sentence: String
     let response: String
     let date: Date
+}
+
+// MARK: - Test Database
+
+extension DatabaseWriter where Self == DatabaseQueue {
+    /// Test database for previews and tests
+    static var testDatabase: Self {
+        let database = try! DatabaseQueue()
+        var migrator = DatabaseMigrator()
+        
+        migrator.registerMigration("Create test table") { db in
+            try #sql(
+                """
+                CREATE TABLE "comparisonHistories" (
+                    "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+                    "word1" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                    "word2" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                    "sentence" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                    "response" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                    "date" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP
+                ) STRICT
+                """
+            )
+            .execute(db)
+            
+            // Seed some test data
+            try ComparisonHistory.insert {
+                [
+                    ComparisonHistory.Draft(
+                        word1: "character",
+                        word2: "characteristic",
+                        sentence: "The character of this wine is unique.",
+                        response: "Test response...",
+                        date: Date()
+                    ),
+                    ComparisonHistory.Draft(
+                        word1: "affect",
+                        word2: "effect",
+                        sentence: "How does this affect the result?",
+                        response: "Another test response...",
+                        date: Date().addingTimeInterval(-3600)
+                    )
+                ]
+            }
+            .execute(db)
+        }
+        
+        try! migrator.migrate(database)
+        return database
+    }
 }
