@@ -13,7 +13,7 @@ struct WordComparatorMainView: View {
     @Bindable var store: StoreOf<WordComparatorFeature>
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
             ScrollView {
                 VStack(spacing: 20) {
                     headerView
@@ -35,44 +35,43 @@ struct WordComparatorMainView: View {
                 .padding()
             }
             .navigationTitle("Word Comparator")
-#if os(iOS)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
-#endif
+            #endif
             .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
+                #if os(iOS)
+                
+
+ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
                         historyButton
                         settingsButton
                     }
                 }
-#else
+                #else
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: 12) {
                         historyButton
                         settingsButton
                     }
                 }
-#endif
+                #endif
             }
             .onAppear {
                 store.send(.onAppear)
             }
-            .navigationDestination(
-                store: store.scope(state: \.$destination.detail, action: \.destination.detail)
-            ) { detailStore in
+        } destination: { store in
+            switch store.case {
+            case let .detail(detailStore):
                 ResponseDetailView(store: detailStore)
+            case let .historyList(historyStore):
+                ComparisonHistoryListView(store: historyStore)
             }
-            .navigationDestination(
-                store: store.scope(state: \.$destination.historyList, action: \.destination.historyList)
-            ) { store in
-                ComparisonHistoryListView(store: store)
-            }
-            .sheet(
-                item: $store.scope(state: \.destination?.settings, action: \.destination.settings)
-            ) { settingsStore in
-                SettingsView(store: settingsStore)
-            }
+        }
+        .sheet(
+            item: $store.scope(state: \.settings, action: \.settings)
+        ) { settingsStore in
+            SettingsView(store: settingsStore)
         }
     }
     

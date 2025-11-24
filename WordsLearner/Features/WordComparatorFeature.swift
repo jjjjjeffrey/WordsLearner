@@ -13,9 +13,8 @@ import SQLiteData
 struct WordComparatorFeature {
     
     @Reducer
-    enum Destination {
+    enum Path {
         case detail(ResponseDetailFeature)
-        case settings(SettingsFeature)
         case historyList(ComparisonHistoryListFeature)
     }
     
@@ -28,7 +27,8 @@ struct WordComparatorFeature {
         
         var recentComparisons = RecentComparisonsFeature.State()
         
-        @Presents var destination: Destination.State?
+        var path = StackState<Path.State>()
+        @Presents var settings: SettingsFeature.State?
         
         var canGenerate: Bool {
             !word1.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
@@ -43,7 +43,8 @@ struct WordComparatorFeature {
         case generateButtonTapped
         case settingsButtonTapped
         case historyListButtonTapped
-        case destination(PresentationAction<Destination.Action>)
+        case path(StackActionOf<Path>)
+        case settings(PresentationAction<SettingsFeature.Action>)
         case apiKeyStatusChanged(Bool)
         case recentComparisons(RecentComparisonsFeature.Action)
     }
@@ -65,33 +66,37 @@ struct WordComparatorFeature {
                 return .none
                 
             case .settingsButtonTapped:
-                state.destination = .settings(SettingsFeature.State())
+                state.settings = SettingsFeature.State()
                 return .none
                 
             case .generateButtonTapped:
                 guard state.canGenerate && state.hasValidAPIKey else { return .none }
-                
-                state.destination = .detail(
+                state.path.append(.detail(
                     ResponseDetailFeature.State(
                         word1: state.word1,
                         word2: state.word2,
                         sentence: state.sentence
                     )
-                )
+                ))
+                return .none
+                
+            case .historyListButtonTapped:
+                state.path.append(.historyList(ComparisonHistoryListFeature.State()))
                 return .none
                 
             case let .apiKeyStatusChanged(hasKey):
                 state.hasValidAPIKey = hasKey
                 return .none
                 
-            case .destination(.presented(.settings(.delegate(.apiKeyChanged)))):
+            case .settings(.presented(.delegate(.apiKeyChanged))):
                 state.hasValidAPIKey = apiKeyManager.hasValidAPIKey()
                 return .none
+                
             case let .recentComparisons(.delegate(.comparisonSelected(comparison))):
                 state.word1 = comparison.word1
                 state.word2 = comparison.word2
                 state.sentence = comparison.sentence
-                state.destination = .detail(
+                state.path.append(.detail(
                     ResponseDetailFeature.State(
                         word1: comparison.word1,
                         word2: comparison.word2,
@@ -99,41 +104,45 @@ struct WordComparatorFeature {
                         streamingResponse: comparison.response,
                         shouldStartStreaming: false
                     )
-                )
-                return .none
-                // Add this new case
-            case .historyListButtonTapped:
-                state.destination = .historyList(ComparisonHistoryListFeature.State())
+                ))
                 return .none
                 
-                // Add handler for history list delegate
-            case let .destination(.presented(.historyList(.delegate(.comparisonSelected(comparison))))):
-                state.word1 = comparison.word1
-                state.word2 = comparison.word2
-                state.sentence = comparison.sentence
-                state.destination = .detail(
-                    ResponseDetailFeature.State(
-                        word1: comparison.word1,
-                        word2: comparison.word2,
-                        sentence: comparison.sentence,
-                        streamingResponse: comparison.response,
-                        shouldStartStreaming: false
-                    )
-                )
-                return .none
+            case let .path(action):
+                switch action {
+                case .element(id: _, action: .historyList(.delegate(.comparisonSelected(let comparison)))):
+                    state.word1 = comparison.word1
+                    state.word2 = comparison.word2
+                    state.sentence = comparison.sentence
+                    state.path.append(.detail(
+                        ResponseDetailFeature.State(
+                            word1: comparison.word1,
+                            word2: comparison.word2,
+                            sentence: comparison.sentence,
+                            streamingResponse: comparison.response,
+                            shouldStartStreaming: false
+                        )
+                    ))
+                    return .none
+                    
+                default:
+                    return .none
+
+
+                }
                 
             case .recentComparisons:
                 return .none
-                
-            case .destination:
+            case .settings:
                 return .none
-                
             case .binding:
                 return .none
             }
         }
-        .ifLet(\.$destination, action: \.destination)
+        .forEach(\.path, action: \.path)
+        .ifLet(\.$settings, action: \.settings) {
+            SettingsFeature()
+        }
     }
 }
 
-extension WordComparatorFeature.Destination.State: Equatable {}
+extension WordComparatorFeature.Path.State: Equatable {}
