@@ -25,9 +25,6 @@ struct WordComparatorMainView: View {
                     inputFieldsView
                     generateButtonView
                     
-                    // Add header with "View All" button
-                    recentComparisonsHeader
-                    
                     RecentComparisonsView(
                         store: store.scope(
                             state: \.recentComparisons,
@@ -38,19 +35,25 @@ struct WordComparatorMainView: View {
                 .padding()
             }
             .navigationTitle("Word Comparator")
-            #if os(iOS)
+#if os(iOS)
             .navigationBarTitleDisplayMode(.large)
-            #endif
+#endif
             .toolbar {
-                #if os(iOS)
+#if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    settingsButton
+                    HStack(spacing: 16) {
+                        historyButton
+                        settingsButton
+                    }
                 }
-                #else
+#else
                 ToolbarItem(placement: .primaryAction) {
-                    settingsButton
+                    HStack(spacing: 12) {
+                        historyButton
+                        settingsButton
+                    }
                 }
-                #endif
+#endif
             }
             .onAppear {
                 store.send(.onAppear)
@@ -73,27 +76,13 @@ struct WordComparatorMainView: View {
         }
     }
     
-    // Add this new view
-    private var recentComparisonsHeader: some View {
-        HStack {
-            Label("Recent Comparisons", systemImage: "clock.arrow.circlepath")
-                .font(.headline)
-            
-            Spacer()
-            
-            Button {
-                store.send(.historyListButtonTapped)
-            } label: {
-                HStack(spacing: 4) {
-                    Text("View All")
-                        .font(.subheadline)
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                }
-                .foregroundColor(AppColors.primary)
-            }
+    private var historyButton: some View {
+        Button {
+            store.send(.historyListButtonTapped)
+        } label: {
+            Image(systemName: "clock")
+                .foregroundColor(.primary)
         }
-        .padding(.horizontal, 4)
     }
     
     private var settingsButton: some View {
@@ -214,4 +203,3 @@ struct WordComparatorMainView: View {
         }
     )
 }
-
