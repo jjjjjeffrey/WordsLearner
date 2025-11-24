@@ -54,7 +54,7 @@ private func createAppDatabase() throws -> any DatabaseWriter {
             }
         }
     }
-    #endif
+    #endif // DEBUG
     
     let database = try SQLiteData.defaultDatabase(configuration: configuration)
     
@@ -158,62 +158,7 @@ private func createAppDatabase() throws -> any DatabaseWriter {
     
     try migrator.migrate(database)
     
-    // Optional: Migrate from UserDefaults on first launch
-    #if !DEBUG
-    try migrateFromUserDefaultsIfNeeded(database)
-    #endif
-    
     return database
-}
-
-/// Migrate legacy data from UserDefaults to SQLite (one-time migration)
-private func migrateFromUserDefaultsIfNeeded(_ database: any DatabaseWriter) throws {
-    let migrationKey = "DidMigrateToSQLite_v1"
-    
-    guard !UserDefaults.standard.bool(forKey: migrationKey) else {
-        logger.info("Already migrated from UserDefaults")
-        return
-    }
-    
-    guard let data = UserDefaults.standard.data(forKey: "RecentComparisons"),
-          let oldComparisons = try? JSONDecoder().decode([LegacyComparisonHistory].self, from: data)
-    else {
-        logger.info("No legacy data to migrate")
-        UserDefaults.standard.set(true, forKey: migrationKey)
-        return
-    }
-    
-    try database.write { db in
-        for comparison in oldComparisons {
-            try ComparisonHistory.insert {
-                ComparisonHistory.Draft(
-                    id: comparison.id,
-                    word1: comparison.word1,
-                    word2: comparison.word2,
-                    sentence: comparison.sentence,
-                    response: comparison.response,
-                    date: comparison.date
-                )
-            }
-            .execute(db)
-        }
-    }
-    
-    // Mark migration as complete and clean up
-    UserDefaults.standard.set(true, forKey: migrationKey)
-    UserDefaults.standard.removeObject(forKey: "RecentComparisons")
-    
-    logger.info("✅ Migrated \(oldComparisons.count) records from UserDefaults")
-}
-
-// Legacy model for migration
-private struct LegacyComparisonHistory: Codable {
-    let id: UUID
-    let word1: String
-    let word2: String
-    let sentence: String
-    let response: String
-    let date: Date
 }
 
 // MARK: - Test Database
