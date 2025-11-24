@@ -44,6 +44,11 @@ struct AppColors {
     static let fieldBorder = Color("FieldBorder")
     static let separator = Color("Separator")
     
+    // MARK: - List & Card Colors
+    static let listRowBackground = Color("ListRowBackground")
+    static let cardShadow = Color("CardShadow")
+    static let hoverBackground = Color("HoverBackground")
+    
     // MARK: - System Fallbacks (for compatibility)
     static let systemGray6Fallback: Color = {
         #if os(iOS)
@@ -66,6 +71,23 @@ struct AppColors {
         return Color(.systemBackground)
         #else
         return Color(.windowBackgroundColor)
+        #endif
+    }()
+    
+    // MARK: - Dynamic Colors for Cross-Platform
+    static let dynamicCardBackground: Color = {
+        #if os(iOS)
+        return cardBackground
+        #else
+        return cardBackground.opacity(0.8)
+        #endif
+    }()
+    
+    static let dynamicSeparator: Color = {
+        #if os(iOS)
+        return separator
+        #else
+        return separator.opacity(0.6)
         #endif
     }()
 }

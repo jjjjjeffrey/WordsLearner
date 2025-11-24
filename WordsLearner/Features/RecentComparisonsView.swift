@@ -16,7 +16,7 @@ struct RecentComparisonsView: View {
     var body: some View {
         Group {
             if !store.recentComparisons.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 16) {
                     headerSection
                     comparisonsList
                 }
@@ -42,6 +42,7 @@ struct RecentComparisonsView: View {
         HStack {
             Label("Recent Comparisons", systemImage: "clock.arrow.circlepath")
                 .font(.headline)
+                .foregroundColor(AppColors.primaryText)
             
             Spacer()
             
@@ -53,20 +54,18 @@ struct RecentComparisonsView: View {
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
-                    .foregroundColor(.secondary)
+                    .foregroundColor(AppColors.secondaryText)
             }
         }
+        .padding(.horizontal, 4)
     }
     
     private var comparisonsList: some View {
-        LazyVStack(spacing: 8) {
+        LazyVStack(spacing: platformSpacing()) {
             ForEach(store.recentComparisons) { comparison in
-                RecentComparisonRow(comparison: comparison) {
+                SharedComparisonRow(comparison: comparison) {
                     store.send(.comparisonTapped(comparison))
                 }
-            }
-            .onDelete { indexSet in
-                store.send(.deleteComparisons(indexSet))
             }
         }
     }
@@ -75,19 +74,27 @@ struct RecentComparisonsView: View {
         VStack(spacing: 16) {
             Image(systemName: "clock.badge.questionmark")
                 .font(.system(size: 60))
-                .foregroundColor(.secondary.opacity(0.5))
+                .foregroundColor(AppColors.secondaryText.opacity(0.5))
             
             Text("No Recent Comparisons")
                 .font(.headline)
-                .foregroundColor(.secondary)
+                .foregroundColor(AppColors.secondaryText)
             
             Text("Your comparison history will appear here")
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(AppColors.tertiaryText)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
+    }
+    
+    private func platformSpacing() -> CGFloat {
+        #if os(iOS)
+        return 12
+        #else
+        return 8
+        #endif
     }
 }
 

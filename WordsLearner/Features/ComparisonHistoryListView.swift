@@ -13,22 +13,12 @@ struct ComparisonHistoryListView: View {
     @Bindable var store: StoreOf<ComparisonHistoryListFeature>
     
     var body: some View {
-        List {
-            if store.filteredComparisons.isEmpty {
-                emptyStateSection
-            } else {
-                ForEach(store.filteredComparisons) { comparison in
-                    Button {
-                        store.send(.comparisonTapped(comparison))
-                    } label: {
-                        ComparisonHistoryRow(comparison: comparison)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .onDelete { indexSet in
-                    store.send(.deleteComparisons(indexSet))
-                }
-            }
+        Group {
+            #if os(iOS)
+            iosList
+            #else
+            macOSScrollView
+            #endif
         }
         .navigationTitle("All Comparisons")
         #if os(iOS)
@@ -49,27 +39,86 @@ struct ComparisonHistoryListView: View {
         .alert($store.scope(state: \.alert, action: \.alert))
     }
     
-    private var emptyStateSection: some View {
-        Section {
-            VStack(spacing: 16) {
-                Image(systemName: store.searchText.isEmpty ? "tray" : "magnifyingglass")
-                    .font(.system(size: 50))
-                    .foregroundColor(.secondary.opacity(0.5))
-                
-                Text(store.searchText.isEmpty ? "No History Yet" : "No Results Found")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-                
-                if !store.searchText.isEmpty {
-                    Text("Try different keywords")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+    // MARK: - iOS List View
+    #if os(iOS)
+    private var iosList: some View {
+        List {
+            if store.filteredComparisons.isEmpty {
+                emptyStateSection
+            } else {
+                ForEach(store.filteredComparisons) { comparison in
+                    SharedComparisonRow(comparison: comparison) {
+                        store.send(.comparisonTapped(comparison))
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                }
+                .onDelete { indexSet in
+                    store.send(.deleteComparisons(indexSet))
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 60)
+        }
+        .listStyle(PlainListStyle())
+    }
+    #endif
+    
+    // MARK: - macOS Scroll View
+    #if os(macOS)
+    private var macOSScrollView: some View {
+        ScrollView {
+            LazyVStack(spacing: 8) {
+                if store.filteredComparisons.isEmpty {
+                    emptyStateView
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 60)
+                } else {
+                    ForEach(store.filteredComparisons) { comparison in
+                        SharedComparisonRow(comparison: comparison) {
+                            store.send(.comparisonTapped(comparison))
+                        }
+                        .contextMenu {
+                            Button("Delete", role: .destructive) {
+                                if let index = store.filteredComparisons.firstIndex(where: { $0.id == comparison.id }) {
+                                    store.send(.deleteComparisons(IndexSet(integer: index)))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding()
+        }
+    }
+    #endif
+    
+    // MARK: - Shared Components
+    private var emptyStateSection: some View {
+        Section {
+            emptyStateView
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 60
+
+)
         }
         .listRowBackground(Color.clear)
+    }
+    
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: store.searchText.isEmpty ? "tray" : "magnifyingglass")
+                .font(.system(size: 50))
+                .foregroundColor(AppColors.secondaryText.opacity(0.5))
+            
+            Text(store.searchText.isEmpty ? "No History Yet" : "No Results Found")
+                .font(.headline)
+                .foregroundColor(AppColors.secondaryText)
+            
+            if !store.searchText.isEmpty {
+                Text("Try different keywords")
+                    .font(.caption)
+                    .foregroundColor(AppColors.tertiaryText)
+            }
+        }
     }
     
     private var clearAllButton: some View {
@@ -77,59 +126,9 @@ struct ComparisonHistoryListView: View {
             store.send(.clearAllButtonTapped)
         } label: {
             Label("Clear All", systemImage: "trash")
+                .foregroundColor(AppColors.error)
         }
         .disabled(store.allComparisons.isEmpty)
-    }
-}
-
-// MARK: - Row Component
-private struct ComparisonHistoryRow: View {
-    let comparison: ComparisonHistory
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text(comparison.word1)
-                    .font(.headline)
-                    .foregroundColor(AppColors.word1Color)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(AppColors.word1Background)
-                    )
-                
-                Text("vs")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                Text(comparison.word2)
-                    .font(.headline)
-                    .foregroundColor(AppColors.word2Color)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(AppColors.word2Background)
-                    )
-                
-                Spacer()
-            }
-            
-            Text(comparison.sentence)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-            
-            HStack {
-                Image(systemName: "clock")
-                    .font(.caption2)
-                Text(comparison.date.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
-            }
-            .foregroundColor(.secondary)
-        }
-        .padding(.vertical, 4)
     }
 }
 
