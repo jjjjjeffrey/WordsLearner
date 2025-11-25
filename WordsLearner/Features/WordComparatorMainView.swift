@@ -23,7 +23,11 @@ struct WordComparatorMainView: View {
                     }
                     
                     inputFieldsView
-                    generateButtonView
+                    generateButtonsView
+                    
+                    if !store.backgroundTasks.isEmpty {
+                        backgroundTasksQueueView
+                    }
                     
                     RecentComparisonsView(
                         store: store.scope(
@@ -40,9 +44,7 @@ struct WordComparatorMainView: View {
             #endif
             .toolbar {
                 #if os(iOS)
-                
-
-ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
                         historyButton
                         settingsButton
@@ -73,6 +75,7 @@ ToolbarItem(placement: .navigationBarTrailing) {
         ) { settingsStore in
             SettingsView(store: settingsStore)
         }
+        .alert($store.scope(state: \.alert, action: \.alert))
     }
     
     private var historyButton: some View {
@@ -170,24 +173,109 @@ ToolbarItem(placement: .navigationBarTrailing) {
         .padding(.horizontal, 4)
     }
     
-    private var generateButtonView: some View {
-        Button {
-            store.send(.generateButtonTapped)
-        } label: {
-            HStack {
-                Image(systemName: "sparkles")
-                Text("Generate Comparison")
-                    .fontWeight(.semibold)
+    private var generateButtonsView: some View {
+        HStack(spacing: 12) {
+            Button {
+                store.send(.generateButtonTapped)
+            } label: {
+                HStack {
+                    Image(systemName: "sparkles")
+                    Text("Generate")
+                        .fontWeight(.semibold)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill((store.canGenerate && store.hasValidAPIKey) ? AppColors.primary : AppColors.separator)
+                )
+                .foregroundColor((store.canGenerate && store.hasValidAPIKey) ? .white : .gray)
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill((store.canGenerate && store.hasValidAPIKey) ? AppColors.primary : AppColors.separator)
-            )
-            .foregroundColor((store.canGenerate && store.hasValidAPIKey) ? .white : .gray)
+            .disabled(!store.canGenerate || !store.hasValidAPIKey)
+            
+            Button {
+                store.send(.generateInBackgroundButtonTapped)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.down.circle")
+                    
+                    #if os(iOS)
+                    if horizontalSizeClass == .regular {
+                        Text("Background")
+                            .fontWeight(.semibold)
+                    }
+                    #else
+                    Text("Background")
+                        .fontWeight(.semibold)
+                    #endif
+                    
+                    if store.pendingTasksCount > 0 {
+                        Text("(\(store.pendingTasksCount))")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                    }
+                }
+                .frame(minWidth: platformButtonWidth())
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill((store.canGenerate && store.hasValidAPIKey) ?
+                              AppColors.secondary : AppColors.separator)
+                )
+                .foregroundColor((store.canGenerate && store.hasValidAPIKey) ?
+                                .white : .gray)
+            }
+            .disabled(!store.canGenerate || !store.hasValidAPIKey)
         }
-        .disabled(!store.canGenerate || !store.hasValidAPIKey)
+    }
+    
+    private var backgroundTasksQueueView: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Label("Background Tasks", systemImage: "list.bullet.rectangle")
+                    .font(.headline)
+                    .foregroundColor(AppColors.primaryText)
+                
+                Spacer()
+                
+                Button {
+                    store.send(.clearCompletedTasks)
+                } label: {
+                    Text("Clear Completed")
+                        .font(.caption)
+                        .foregroundColor(AppColors.primary)
+                }
+            }
+            
+            LazyVStack(spacing: 8) {
+                ForEach(store.backgroundTasks) { task in
+                    BackgroundTaskRow(
+                        task: task,
+                        onRemove: {
+                            store.send(.removeBackgroundTask(task.id))
+                        }
+                    )
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(AppColors.cardBackground)
+                .shadow(color: AppColors.cardShadow.opacity(0.1), radius: 2, x: 0, y: 1)
+        )
+    }
+    
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
+    
+    private func platformButtonWidth() -> CGFloat {
+        #if os(iOS)
+        return 50
+        #else
+        return 120
+        #endif
     }
 }
 
@@ -202,3 +290,4 @@ ToolbarItem(placement: .navigationBarTrailing) {
         }
     )
 }
+
