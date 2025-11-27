@@ -15,6 +15,12 @@ struct EnglishWordComparatorApp: App {
         try! prepareDependencies {
             try $0.bootstrapDatabase()
         }
+        
+        // Start background task processing
+        Task {
+            @Dependency(\.backgroundTaskManager) var taskManager
+            await taskManager.startProcessingLoop()
+        }
     }
     
     var body: some Scene {
@@ -27,3 +33,4 @@ struct EnglishWordComparatorApp: App {
         }
     }
 }
+

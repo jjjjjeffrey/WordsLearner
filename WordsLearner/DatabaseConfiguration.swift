@@ -28,12 +28,6 @@ extension DependencyValues {
         )
         
         defaultDatabase = database
-        
-        // Optional: Configure sync engine for CloudKit
-        // defaultSyncEngine = try SyncEngine(
-        //     for: defaultDatabase,
-        //     tables: ComparisonHistory.self
-        // )
     }
 }
 
@@ -99,6 +93,44 @@ private func createAppDatabase() throws -> any DatabaseWriter {
         .execute(db)
     }
     
+    // Migration for background tasks table
+    migrator.registerMigration("v1.2 - Create backgroundTasks table") { db in
+        try #sql(
+            """
+            CREATE TABLE "backgroundTasks" (
+                "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+                "word1" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "word2" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "sentence" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "status" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT 'pending',
+                "response" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "error" TEXT,
+                "createdAt" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP,
+                "updatedAt" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP
+            ) STRICT
+            """
+        )
+        .execute(db)
+        
+        // Create index for status queries
+        try #sql(
+            """
+            CREATE INDEX "idx_backgroundTasks_status" 
+            ON "backgroundTasks" ("status")
+            """
+        )
+        .execute(db)
+        
+        // Create index for date-based queries
+        try #sql(
+            """
+            CREATE INDEX "idx_backgroundTasks_createdAt" 
+            ON "backgroundTasks" ("createdAt" DESC)
+            """
+        )
+        .execute(db)
+    }
+    
     // Optional: Create Full-Text Search table for advanced search
     migrator.registerMigration("v1.1 - Create FTS table") { db in
         try #sql(
@@ -153,9 +185,6 @@ private func createAppDatabase() throws -> any DatabaseWriter {
         .execute(db)
     }
     
-    // Future migrations can be added here
-    // migrator.registerMigration("v1.2 - Add favorites") { db in ... }
-    
     try migrator.migrate(database)
     
     return database
@@ -169,7 +198,8 @@ extension DatabaseWriter where Self == DatabaseQueue {
         let database = try! DatabaseQueue()
         var migrator = DatabaseMigrator()
         
-        migrator.registerMigration("Create test table") { db in
+        migrator.registerMigration("Create test tables") { db in
+            // ComparisonHistory table
             try #sql(
                 """
                 CREATE TABLE "comparisonHistories" (
@@ -179,6 +209,24 @@ extension DatabaseWriter where Self == DatabaseQueue {
                     "sentence" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
                     "response" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
                     "date" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP
+                ) STRICT
+                """
+            )
+            .execute(db)
+            
+            // BackgroundTask table
+            try #sql(
+                """
+                CREATE TABLE "backgroundTasks" (
+                    "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+                    "word1" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                    "word2" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                    "sentence" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                    "status" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT 'pending',
+                    "response" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                    "error" TEXT,
+                    "createdAt" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP,
+                    "updatedAt" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP
                 ) STRICT
                 """
             )
@@ -200,6 +248,35 @@ extension DatabaseWriter where Self == DatabaseQueue {
                         sentence: "How does this affect the result?",
                         response: "Another test response...",
                         date: Date().addingTimeInterval(-3600)
+                    )
+                ]
+            }
+            .execute(db)
+            
+            // Seed test background tasks
+            try BackgroundTask.insert {
+                [
+                    BackgroundTask.Draft(
+                        id: UUID(),
+                        word1: "accept",
+                        word2: "except",
+                        sentence: "I accept all terms.",
+                        status: "pending",
+                        response: "",
+                        error: nil,
+                        createdAt: Date(),
+                        updatedAt: Date()
+                    ),
+                    BackgroundTask.Draft(
+                        id: UUID(),
+                        word1: "advice",
+                        word2: "advise",
+                        sentence: "Can you give me some advice?",
+                        status: "completed",
+                        response: "Test response for advice vs advise...",
+                        error: nil,
+                        createdAt: Date().addingTimeInterval(-3600),
+                        updatedAt: Date().addingTimeInterval(-1800)
                     )
                 ]
             }

@@ -25,10 +25,6 @@ struct WordComparatorMainView: View {
                     inputFieldsView
                     generateButtonsView
                     
-                    if !store.backgroundTasks.isEmpty {
-                        backgroundTasksQueueView
-                    }
-                    
                     RecentComparisonsView(
                         store: store.scope(
                             state: \.recentComparisons,
@@ -46,6 +42,7 @@ struct WordComparatorMainView: View {
                 #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
+                        backgroundTasksButton
                         historyButton
                         settingsButton
                     }
@@ -53,6 +50,7 @@ struct WordComparatorMainView: View {
                 #else
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: 12) {
+                        backgroundTasksButton
                         historyButton
                         settingsButton
                     }
@@ -68,6 +66,8 @@ struct WordComparatorMainView: View {
                 ResponseDetailView(store: detailStore)
             case let .historyList(historyStore):
                 ComparisonHistoryListView(store: historyStore)
+            case let .backgroundTasks(backgroundTasksStore):
+                BackgroundTasksView(store: backgroundTasksStore)
             }
         }
         .sheet(
@@ -76,6 +76,30 @@ struct WordComparatorMainView: View {
             SettingsView(store: settingsStore)
         }
         .alert($store.scope(state: \.alert, action: \.alert))
+    }
+    
+    // MARK: - Toolbar Buttons
+    
+    private var backgroundTasksButton: some View {
+        Button {
+            store.send(.backgroundTasksButtonTapped)
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .foregroundColor(.primary)
+                
+                // Badge for pending tasks count
+                if store.pendingTasksCount > 0 {
+                    Text("\(store.pendingTasksCount)")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .padding(4)
+                        .background(Circle().fill(AppColors.error))
+                        .offset(x: 8, y: -8)
+                }
+            }
+        }
     }
     
     private var historyButton: some View {
@@ -95,6 +119,8 @@ struct WordComparatorMainView: View {
                 .foregroundColor(.primary)
         }
     }
+    
+    // MARK: - Content Views
     
     private var headerView: some View {
         VStack(spacing: 8) {
@@ -229,43 +255,6 @@ struct WordComparatorMainView: View {
         }
     }
     
-    private var backgroundTasksQueueView: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Label("Background Tasks", systemImage: "list.bullet.rectangle")
-                    .font(.headline)
-                    .foregroundColor(AppColors.primaryText)
-                
-                Spacer()
-                
-                Button {
-                    store.send(.clearCompletedTasks)
-                } label: {
-                    Text("Clear Completed")
-                        .font(.caption)
-                        .foregroundColor(AppColors.primary)
-                }
-            }
-            
-            LazyVStack(spacing: 8) {
-                ForEach(store.backgroundTasks) { task in
-                    BackgroundTaskRow(
-                        task: task,
-                        onRemove: {
-                            store.send(.removeBackgroundTask(task.id))
-                        }
-                    )
-                }
-            }
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(AppColors.cardBackground)
-                .shadow(color: AppColors.cardShadow.opacity(0.1), radius: 2, x: 0, y: 1)
-        )
-    }
-    
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
@@ -290,4 +279,3 @@ struct WordComparatorMainView: View {
         }
     )
 }
-
