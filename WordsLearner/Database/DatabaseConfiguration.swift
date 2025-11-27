@@ -261,7 +261,7 @@ extension DatabaseWriter where Self == DatabaseQueue {
                         word1: "accept",
                         word2: "except",
                         sentence: "I accept all terms.",
-                        status: "pending",
+                        status: BackgroundTask.Status.pending.rawValue,
                         response: "",
                         error: nil,
                         createdAt: Date(),
@@ -272,11 +272,33 @@ extension DatabaseWriter where Self == DatabaseQueue {
                         word1: "advice",
                         word2: "advise",
                         sentence: "Can you give me some advice?",
-                        status: "completed",
+                        status: BackgroundTask.Status.completed.rawValue,
                         response: "Test response for advice vs advise...",
                         error: nil,
                         createdAt: Date().addingTimeInterval(-3600),
                         updatedAt: Date().addingTimeInterval(-1800)
+                    ),
+                    BackgroundTask.Draft(
+                        id: UUID(),
+                        word1: "complement",
+                        word2: "compliment",
+                        sentence: "Your shoes complement the outfit.",
+                        status: BackgroundTask.Status.generating.rawValue,
+                        response: "",
+                        error: nil,
+                        createdAt: Date().addingTimeInterval(-7200),
+                        updatedAt: Date().addingTimeInterval(-3600)
+                    ),
+                    BackgroundTask.Draft(
+                        id: UUID(),
+                        word1: "principle",
+                        word2: "principal",
+                        sentence: "Honesty is the best principle.",
+                        status: BackgroundTask.Status.failed.rawValue,
+                        response: "",
+                        error: "Simulated failure during generation.",
+                        createdAt: Date().addingTimeInterval(-10800),
+                        updatedAt: Date().addingTimeInterval(-7200)
                     )
                 ]
             }
