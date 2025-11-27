@@ -235,12 +235,30 @@ struct SettingsView: View {
     }
 }
 
-#Preview {
-    SettingsView(
-        store: Store(initialState: SettingsFeature.State()) {
-            SettingsFeature()
-        }
-    )
+#if DEBUG
+#Preview("Empty State") {
+    withDependencies {
+        $0.apiKeyManager = .testNoValidAPIKeyValue
+    } operation: {
+        SettingsView(
+            store: Store(initialState: .init()) {
+                SettingsFeature()
+            }
+        )
+    }
 }
+
+#Preview("Configured State") {
+    withDependencies {
+        $0.apiKeyManager = .testValue
+    } operation: {
+        SettingsView(
+            store: Store(initialState: .init()) {
+                SettingsFeature()
+            }
+        )
+    }
+}
+#endif
 
 

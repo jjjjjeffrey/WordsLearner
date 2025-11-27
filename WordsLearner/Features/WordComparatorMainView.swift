@@ -269,47 +269,15 @@ struct WordComparatorMainView: View {
 }
 
 #if DEBUG
-private func wordComparatorPreviewStore(
-    for state: WordComparatorFeature.State
-) -> StoreOf<WordComparatorFeature> {
-    return Store(initialState: state) {
-        WordComparatorFeature()
-    }
-}
-
-private extension WordComparatorFeature.State {
-    static var previewEmpty: Self {
-        Self()
-    }
-    
-    static var previewReadyToGenerate: Self {
-        var state = Self()
-        state.word1 = "affect"
-        state.word2 = "effect"
-        state.sentence = "The new policy will affect how the bonus takes effect."
-        state.hasValidAPIKey = true
-        return state
-    }
-    
-    static var previewMissingAPIKey: Self {
-        var state = Self.previewReadyToGenerate
-        state.hasValidAPIKey = false
-        return state
-    }
-    
-    static var previewRecentComparisons: Self {
-        var state = Self.previewEmpty
-        state.hasValidAPIKey = true
-        return state
-    }
-}
 
 #Preview("Empty / Default") {
     withDependencies {
         $0.apiKeyManager = .testValue
     } operation: {
         WordComparatorMainView(
-            store: wordComparatorPreviewStore(for: .init())
+            store: Store(initialState: .init()) {
+                WordComparatorFeature()
+            }
         )
     }
 }
@@ -319,7 +287,9 @@ private extension WordComparatorFeature.State {
         $0.apiKeyManager = .testValue
     } operation: {
         WordComparatorMainView(
-            store: wordComparatorPreviewStore(for: .init(word1: "affect", word2: "effect", sentence: "The new policy will affect how the bonus takes effect.", hasValidAPIKey: true))
+            store: Store(initialState: .init(word1: "affect", word2: "effect", sentence: "The new policy will affect how the bonus takes effect.", hasValidAPIKey: true)) {
+                WordComparatorFeature()
+            }
         )
     }
 }
@@ -329,7 +299,9 @@ private extension WordComparatorFeature.State {
         $0.apiKeyManager = .testNoValidAPIKeyValue
     } operation: {
         WordComparatorMainView(
-            store: wordComparatorPreviewStore(for: .init())
+            store: Store(initialState: .init()) {
+                WordComparatorFeature()
+            }
         )
     }
 }
@@ -340,7 +312,9 @@ private extension WordComparatorFeature.State {
         $0.defaultDatabase = .testDatabase
     } operation: {
         WordComparatorMainView(
-            store: wordComparatorPreviewStore(for: .init())
+            store: Store(initialState: .init()) {
+                WordComparatorFeature()
+            }
         )
     }
 }
