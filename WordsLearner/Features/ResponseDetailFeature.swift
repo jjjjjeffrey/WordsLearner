@@ -33,9 +33,8 @@ struct ResponseDetailFeature {
         case comparisonSaveFailed(Error)
     }
     
-    @Dependency(\.aiService) var aiService
+    @Dependency(\.comparisonGenerator) var generator
     @Dependency(\.date.now) var now
-    @Dependency(\.defaultDatabase) var database
     
     var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -48,15 +47,9 @@ struct ResponseDetailFeature {
                 state.isStreaming = true
                 state.errorMessage = nil
                 
-                let prompt = buildPrompt(
-                    word1: state.word1,
-                    word2: state.word2,
-                    sentence: state.sentence
-                )
-                
-                return .run { send in
+                return .run { [word1 = state.word1, word2 = state.word2, sentence = state.sentence] send in
                     do {
-                        for try await chunk in aiService.streamResponse(prompt) {
+                        for try await chunk in generator.generateComparison(word1, word2, sentence) {
                             await send(.streamChunkReceived(chunk))
                         }
                         await send(.streamCompleted)
@@ -71,21 +64,16 @@ struct ResponseDetailFeature {
                 
             case .streamCompleted:
                 state.isStreaming = false
-                let draft = ComparisonHistory.Draft(
-                    word1: state.word1,
-                    word2: state.word2,
-                    sentence: state.sentence,
-                    response: state.streamingResponse,
-                    date: now
-                )
-                return .run { send in
+                
+                return .run { [word1 = state.word1, word2 = state.word2, sentence = state.sentence, response = state.streamingResponse, now] send in
                     do {
-                        try await database.write { db in
-                            try ComparisonHistory.insert {
-                                draft
-                            }
-                            .execute(db)
-                        }
+                        try await generator.saveToHistory(
+                            word1,
+                            word2,
+                            sentence,
+                            response,
+                            now
+                        )
                         await send(.comparisonSaved)
                     } catch {
                         await send(.comparisonSaveFailed(error))
@@ -119,27 +107,4 @@ struct ResponseDetailFeature {
             }
         }
     }
-}
-
-private func buildPrompt(word1: String, word2: String, sentence: String) -> String {
-    return """
-    Help me compare the target English vocabularies "\(word1)" and "\(word2)" by telling me some simple stories that reveal what their means naturally in that specific context. And what's the key difference between them. These stories should illustrate not only the literal meaning but also the figurative meaning, if applicable.
-    
-    I'm an English learner, so tell this story at an elementary third-grade level, using only simple words and sentences, and without slang, phrasal verbs, or complex grammar.
-    
-    After the story, give any background or origin information (if it's known or useful), and explain the meaning of the vocabulary clearly.
-    
-    Finally, give 10 numbered example sentences that show the phrase used today in each context, with different tenses and sentence types, including questions. Use **bold** formatting for the target vocabulary throughout.
-
-    If there are some situations we can use both of them without changing the meaning, and some other contexts which they can't be used interchangeably, please give me examples separately.
-
-    At the end, tell me that if I can use them interchangeably in this sentence "\(sentence)"
-    
-    IMPORTANT: Format your response using proper Markdown syntax:
-    - Use ## for main headings
-    - Use ### for subheadings  
-    - Use **text** for bold formatting
-    - Use numbered lists (1. 2. 3.) for examples
-    - Use - for bullet points when appropriate
-    """
 }

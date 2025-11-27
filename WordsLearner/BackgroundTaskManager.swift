@@ -15,15 +15,15 @@ private let logger = Logger(subsystem: "WordsLearner", category: "BackgroundTask
 /// Centralized manager for background task processing
 actor BackgroundTaskManager {
     private let database: any DatabaseWriter
-    private let aiService: AIServiceClient
+    private let generator: ComparisonGenerationService
     
     private var processingTask: Task<Void, Never>?
     private var isRunning = false
     private var currentTaskId: UUID?
     
-    init(database: any DatabaseWriter, aiService: AIServiceClient) {
+    init(database: any DatabaseWriter, generator: ComparisonGenerationService) {
         self.database = database
-        self.aiService = aiService
+        self.generator = generator
     }
     
     // MARK: - Public Interface
@@ -137,15 +137,13 @@ actor BackgroundTaskManager {
             // Update status to generating
             try await updateTaskStatus(taskId: task.id, status: .generating)
             
-            // Generate AI response
-            let prompt = buildPrompt(
+            // Generate AI response using shared service
+            var fullResponse = ""
+            for try await chunk in generator.generateComparison(
                 word1: task.word1,
                 word2: task.word2,
                 sentence: task.sentence
-            )
-            
-            var fullResponse = ""
-            for try await chunk in aiService.streamResponse(prompt) {
+            ) {
                 fullResponse += chunk
             }
             
@@ -158,8 +156,14 @@ actor BackgroundTaskManager {
                 status: .completed
             )
             
-            // Save to comparison history
-            try await saveToComparisonHistory(task: task, response: fullResponse)
+            // Save to comparison history using shared service
+            try await generator.saveToHistory(
+                word1: task.word1,
+                word2: task.word2,
+                sentence: task.sentence,
+                response: fullResponse,
+                date: Date()
+            )
             
             logger.info("Task \(task.id) saved successfully")
             
@@ -167,7 +171,7 @@ actor BackgroundTaskManager {
             logger.error("Task \(task.id) failed: \(error.localizedDescription)")
             
             // Update task status to failed
-            try? await updateTaskWithError(
+            try? await updateTaskWithWithError(
                 taskId: task.id,
                 error: error.localizedDescription
             )
@@ -210,7 +214,7 @@ actor BackgroundTaskManager {
         }
     }
     
-    private func updateTaskWithError(taskId: UUID, error: String) async throws {
+    private func updateTaskWithWithError(taskId: UUID, error: String) async throws {
         try await database.write { db in
             try BackgroundTask
                 .where { $0.id == taskId }
@@ -222,46 +226,6 @@ actor BackgroundTaskManager {
                 .execute(db)
         }
     }
-    
-    private func saveToComparisonHistory(task: BackgroundTask, response: String) async throws {
-        try await database.write { db in
-            try ComparisonHistory.insert {
-                ComparisonHistory.Draft(
-                    word1: task.word1,
-                    word2: task.word2,
-                    sentence: task.sentence,
-                    response: response,
-                    date: Date()
-                )
-            }
-            .execute(db)
-        }
-    }
-}
-
-// MARK: - Prompt Builder
-
-private func buildPrompt(word1: String, word2: String, sentence: String) -> String {
-    return """
-    Help me compare the target English vocabularies "\(word1)" and "\(word2)" by telling me some simple stories that reveal what their means naturally in that specific context. And what's the key difference between them. These stories should illustrate not only the literal meaning but also the figurative meaning, if applicable.
-    
-    I'm an English learner, so tell this story at an elementary third-grade level, using only simple words and sentences, and without slang, phrasal verbs, or complex grammar.
-    
-    After the story, give any background or origin information (if it's known or useful), and explain the meaning of the vocabulary clearly.
-    
-    Finally, give 10 numbered example sentences that show the phrase used today in each context, with different tenses and sentence types, including questions. Use **bold** formatting for the target vocabulary throughout.
-
-    If there are some situations we can use both of them without changing the meaning, and some other contexts which they can't be used interchangeably, please give me examples separately.
-
-    At the end, tell me that if I can use them interchangeably in this sentence "\(sentence)"
-    
-    IMPORTANT: Format your response using proper Markdown syntax:
-    - Use ## for main headings
-    - Use ### for subheadings  
-    - Use **text** for bold formatting
-    - Use numbered lists (1. 2. 3.) for examples
-    - Use - for bullet points when appropriate
-    """
 }
 
 // MARK: - Dependency Client
@@ -280,7 +244,15 @@ extension BackgroundTaskManagerClient: DependencyKey {
         @Dependency(\.defaultDatabase) var database
         @Dependency(\.aiService) var aiService
         
-        let manager = BackgroundTaskManager(database: database, aiService: aiService)
+        let generator = ComparisonGenerationService(
+            aiService: aiService,
+            database: database
+        )
+        
+        let manager = BackgroundTaskManager(
+            database: database,
+            generator: generator
+        )
         
         return Self(
             startProcessingLoop: { await manager.startProcessingLoop() },
@@ -310,5 +282,6 @@ extension DependencyValues {
         set { self[BackgroundTaskManagerClient.self] = newValue }
     }
 }
+
 
 
