@@ -268,14 +268,80 @@ struct WordComparatorMainView: View {
     }
 }
 
-#Preview {
-    let _ = prepareDependencies {
-        $0.defaultDatabase = .testDatabase
+#if DEBUG
+private func wordComparatorPreviewStore(
+    for state: WordComparatorFeature.State
+) -> StoreOf<WordComparatorFeature> {
+    return Store(initialState: state) {
+        WordComparatorFeature()
+    }
+}
+
+private extension WordComparatorFeature.State {
+    static var previewEmpty: Self {
+        Self()
     }
     
-    WordComparatorMainView(
-        store: Store(initialState: WordComparatorFeature.State()) {
-            WordComparatorFeature()
-        }
-    )
+    static var previewReadyToGenerate: Self {
+        var state = Self()
+        state.word1 = "affect"
+        state.word2 = "effect"
+        state.sentence = "The new policy will affect how the bonus takes effect."
+        state.hasValidAPIKey = true
+        return state
+    }
+    
+    static var previewMissingAPIKey: Self {
+        var state = Self.previewReadyToGenerate
+        state.hasValidAPIKey = false
+        return state
+    }
+    
+    static var previewRecentComparisons: Self {
+        var state = Self.previewEmpty
+        state.hasValidAPIKey = true
+        return state
+    }
 }
+
+#Preview("Empty / Default") {
+    withDependencies {
+        $0.apiKeyManager = .testValue
+    } operation: {
+        WordComparatorMainView(
+            store: wordComparatorPreviewStore(for: .init())
+        )
+    }
+}
+
+#Preview("Ready to Generate") {
+    withDependencies {
+        $0.apiKeyManager = .testValue
+    } operation: {
+        WordComparatorMainView(
+            store: wordComparatorPreviewStore(for: .init(word1: "affect", word2: "effect", sentence: "The new policy will affect how the bonus takes effect.", hasValidAPIKey: true))
+        )
+    }
+}
+
+#Preview("Missing API Key") {
+    withDependencies {
+        $0.apiKeyManager = .testNoValidAPIKeyValue
+    } operation: {
+        WordComparatorMainView(
+            store: wordComparatorPreviewStore(for: .init())
+        )
+    }
+}
+
+#Preview("Recent Comparisons") {
+    withDependencies {
+        $0.apiKeyManager = .testValue
+        $0.defaultDatabase = .testDatabase
+    } operation: {
+        WordComparatorMainView(
+            store: wordComparatorPreviewStore(for: .init())
+        )
+    }
+}
+#endif

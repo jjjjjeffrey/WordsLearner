@@ -124,6 +124,14 @@ extension APIKeyManagerClient: DependencyKey {
         deleteAPIKey: { true },
         validateAPIKey: { _ in true }
     )
+    
+    static let testNoValidAPIKeyValue: Self = Self(
+        hasValidAPIKey: { false },
+        getAPIKey: { "" },
+        saveAPIKey: { _ in false },
+        deleteAPIKey: { false },
+        validateAPIKey: { _ in false }
+    )
 }
 
 extension DependencyValues {
