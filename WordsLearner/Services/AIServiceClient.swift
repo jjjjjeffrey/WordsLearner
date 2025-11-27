@@ -1,5 +1,5 @@
 //
-//  Dependencies.swift
+//  AIServiceClient.swift
 //  WordsLearner
 //
 //  Created by Jeffrey on 11/18/25.
@@ -133,3 +133,35 @@ extension DependencyValues {
     }
 }
 
+// Enhanced error handling
+enum AIError: LocalizedError {
+    case invalidURL
+    case jsonEncodingError
+    case networkError
+    case authenticationError
+    case rateLimitError
+    case apiError(statusCode: Int)
+    case apiResponseError(message: String)
+    case parsingError
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            return "Invalid API URL configuration"
+        case .jsonEncodingError:
+            return "Failed to encode request data"
+        case .networkError:
+            return "Network connection failed"
+        case .authenticationError:
+            return "Authentication failed. Please check your API key."
+        case .rateLimitError:
+            return "Rate limit exceeded. Please try again later."
+        case .apiError(let statusCode):
+            return "API request failed with status code: \(statusCode)"
+        case .apiResponseError(let message):
+            return "API Error: \(message)"
+        case .parsingError:
+            return "Failed to parse AI response"
+        }
+    }
+}
