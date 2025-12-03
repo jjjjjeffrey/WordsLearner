@@ -35,9 +35,14 @@ extension AIServiceClient: DependencyKey {
                         request.httpMethod = "POST"
                         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
                         request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-                        
+                        let model: String
+                        #if DEBUG
+                        model = "gpt-4o-mini"
+                        #else
+                        model = "gemini-3-pro-preview"
+                        #endif
                         let payload: [String: Any] = [
-                            "model": "gemini-3-pro-preview",
+                            "model": model,
                             "messages": [["role": "user", "content": prompt]],
                             "stream": true,
                             "temperature": 0.7
