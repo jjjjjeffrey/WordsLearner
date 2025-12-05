@@ -238,11 +238,23 @@ struct StatusBadge: View {
 }
 
 // MARK: - Preview
-#Preview {
-    let _ = prepareDependencies {
+#Preview("Not empty") {
+    withDependencies {
         $0.defaultDatabase = .testDatabase
+    } operation: {
+        NavigationStack {
+            BackgroundTasksView(
+                store: Store(
+                    initialState: BackgroundTasksFeature.State()
+                ) {
+                    BackgroundTasksFeature()
+                }
+            )
+        }
     }
-    
+}
+
+#Preview("Empty") {
     NavigationStack {
         BackgroundTasksView(
             store: Store(

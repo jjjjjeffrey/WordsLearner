@@ -8,7 +8,7 @@ import ComposableArchitecture
 import SwiftUI
 
 struct BackgroundTaskRow: View {
-    let task: BackgroundTask  // 使用数据库模型
+    let task: BackgroundTask
     let onRemove: () -> Void
     var onTap: (() -> Void)? = nil
     
@@ -17,10 +17,7 @@ struct BackgroundTaskRow: View {
             onTap?()
         } label: {
             HStack(spacing: 12) {
-                // Status indicator
                 statusIcon
-                
-                // Task info
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(task.word1)
@@ -53,7 +50,6 @@ struct BackgroundTaskRow: View {
                 
                 Spacer()
                 
-                // Remove button (only for completed or failed tasks)
                 if task.taskStatus == .completed || task.taskStatus == .failed {
                     Button {
                         onRemove()
@@ -106,3 +102,70 @@ struct BackgroundTaskRow: View {
         }
     }
 }
+
+#if DEBUG
+struct BackgroundTaskRow_Previews: PreviewProvider {
+    static var sampleTasks: [BackgroundTask] = [
+        BackgroundTask(
+            id: UUID(),
+            word1: "accept",
+            word2: "except",
+            sentence: "I accept all of the terms.",
+            status: "pending",
+            response: "",
+            error: nil,
+            createdAt: Date(),
+            updatedAt: Date()
+        ),
+        BackgroundTask(
+            id: UUID(),
+            word1: "advice",
+            word2: "advise",
+            sentence: "Please give me some advice.",
+            status: "generating",
+            response: "",
+            error: nil,
+            createdAt: Date(),
+            updatedAt: Date()
+        ),
+        BackgroundTask(
+            id: UUID(),
+            word1: "affect",
+            word2: "effect",
+            sentence: "How does this affect you?",
+            status: "completed",
+            response: "Some automated response.",
+            error: nil,
+            createdAt: Date(),
+            updatedAt: Date()
+        ),
+        BackgroundTask(
+            id: UUID(),
+            word1: "stationary",
+            word2: "stationery",
+            sentence: "The car is stationary.",
+            status: "failed",
+            response: "",
+            error: "Network error",
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+    ]
+
+    static var previews: some View {
+        VStack(spacing: 16) {
+            ForEach(Array(sampleTasks.enumerated()), id: \.offset) { index, task in
+                BackgroundTaskRow(
+                    task: task,
+                    onRemove: {},
+                    onTap: {}
+                )
+                .previewLayout(.sizeThatFits)
+                .padding(.horizontal)
+            }
+        }
+        .background(AppColors.background)
+        .previewDisplayName("BackgroundTaskRow States")
+    }
+}
+#endif

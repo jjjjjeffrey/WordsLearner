@@ -175,18 +175,22 @@ struct ResponseDetailView: View {
 }
 
 #Preview {
-    NavigationStack {
-        ResponseDetailView(
-            store: Store(
-                initialState: ResponseDetailFeature.State(
-                    word1: "character",
-                    word2: "characteristic",
-                    sentence: "This is a test sentence."
-                )
-            ) {
-                ResponseDetailFeature()
-            }
-        )
+    withDependencies {
+        $0.comparisonGenerator = .testValue
+    } operation: {
+        NavigationStack {
+            ResponseDetailView(
+                store: Store(
+                    initialState: ResponseDetailFeature.State(
+                        word1: "character",
+                        word2: "characteristic",
+                        sentence: "This is a test sentence."
+                    )
+                ) {
+                    ResponseDetailFeature()
+                }
+            )
+        }
     }
 }
 

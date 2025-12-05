@@ -98,11 +98,19 @@ struct RecentComparisonsView: View {
     }
 }
 
-#Preview {
-    let _ = prepareDependencies {
+#Preview("Not empty") {
+    withDependencies {
         $0.defaultDatabase = .testDatabase
+    } operation: {
+        RecentComparisonsView(
+            store: Store(initialState: RecentComparisonsFeature.State()) {
+                RecentComparisonsFeature()
+            }
+        )
     }
-    
+}
+
+#Preview("Empty") {
     RecentComparisonsView(
         store: Store(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()

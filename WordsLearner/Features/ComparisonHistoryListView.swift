@@ -156,102 +156,26 @@ struct ComparisonHistoryListView: View {
     }
 }
 
-#Preview {
-    let _ = prepareDependencies {
+#Preview("Not empty") {
+    withDependencies {
         $0.defaultDatabase = .testDatabase
+    } operation: {
+        NavigationStack {
+            ComparisonHistoryListView(
+                store: Store(initialState: ComparisonHistoryListFeature.State()) {
+                    ComparisonHistoryListFeature()
+                }
+            )
+        }
     }
-    
+}
+
+#Preview("Empty") {
     NavigationStack {
         ComparisonHistoryListView(
             store: Store(initialState: ComparisonHistoryListFeature.State()) {
                 ComparisonHistoryListFeature()
             }
         )
-    }
-}
-
-// MARK: - View Modifiers
-private struct NavigationTitleModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .navigationTitle("All Comparisons")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.large)
-            #endif
-    }
-}
-
-private struct SearchableModifier: ViewModifier {
-    @Bindable var store: StoreOf<ComparisonHistoryListFeature>
-    
-    func body(content: Content) -> some View {
-        content
-            .searchable(text: $store.searchText.sending(\.textChanged), prompt: "Search words or sentence")
-    }
-}
-
-private struct TaskModifier: ViewModifier {
-    @Bindable var store: StoreOf<ComparisonHistoryListFeature>
-    let loadComparisons: () async -> Void
-    
-    func body(content: Content) -> some View {
-        content
-            .task(id: store.searchText) {
-                await loadComparisons()
-            }
-            .task(id: store.showUnreadOnly) {
-                await loadComparisons()
-            }
-    }
-}
-
-private struct ToolbarModifier: ViewModifier {
-    @Bindable var store: StoreOf<ComparisonHistoryListFeature>
-    
-    func body(content: Content) -> some View {
-        content
-            .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        store.send(.filterToggled)
-                    } label: {
-                        Label(
-                            store.showUnreadOnly ? "Show All" : "Unread Only",
-                            systemImage: store.showUnreadOnly ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
-                        )
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        store.send(.clearAllButtonTapped)
-                    } label: {
-                        Label("Clear All", systemImage: "trash")
-                            .foregroundColor(AppColors.error)
-                    }
-                    .disabled(store.allComparisons.isEmpty)
-                }
-                #else
-                ToolbarItem(placement: .primaryAction) {
-                    HStack {
-                        Button {
-                            store.send(.filterToggled)
-                        } label: {
-                            Label(
-                                store.showUnreadOnly ? "Show All" : "Unread Only",
-                                systemImage: store.showUnreadOnly ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
-                            )
-                        }
-                        Button {
-                            store.send(.clearAllButtonTapped)
-                        } label: {
-                            Label("Clear All", systemImage: "trash")
-                                .foregroundColor(AppColors.error)
-                        }
-                        .disabled(store.allComparisons.isEmpty)
-                    }
-                }
-                #endif
-            }
     }
 }

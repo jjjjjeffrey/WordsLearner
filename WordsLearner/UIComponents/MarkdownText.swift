@@ -21,14 +21,14 @@ struct MarkdownText: View {
         Text(attributedString)
             .textSelection(.enabled)
             .onAppear {
-                updateAttributedString()
+                updateAttributedString(content: content)
             }
-            .onChange(of: content) { _ in
-                updateAttributedString()
+            .onChange(of: content) { content in
+                updateAttributedString(content: content)
             }
     }
     
-    private func updateAttributedString() {
+    private func updateAttributedString(content: String) {
         Task {
             let processed = await renderMarkdown(content)
             await MainActor.run {

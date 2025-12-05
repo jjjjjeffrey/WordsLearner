@@ -281,6 +281,30 @@ extension DatabaseWriter where Self == DatabaseQueue {
                         response: "Another test response...",
                         date: Date().addingTimeInterval(-3600),
                         isRead: false
+                    ),
+                    ComparisonHistory.Draft(
+                        word1: "emigrate",
+                        word2: "immigrate",
+                        sentence: "Many people emigrate to find better opportunities.",
+                        response: "A migrated test response...",
+                        date: Date().addingTimeInterval(-7200),
+                        isRead: true
+                    ),
+                    ComparisonHistory.Draft(
+                        word1: "infer",
+                        word2: "imply",
+                        sentence: "What do you infer from her words?",
+                        response: "Implied answer test...",
+                        date: Date().addingTimeInterval(-10800),
+                        isRead: true
+                    ),
+                    ComparisonHistory.Draft(
+                        word1: "stationary",
+                        word2: "stationery",
+                        sentence: "The bike remained stationary.",
+                        response: "More comparison data...",
+                        date: Date().addingTimeInterval(-14400),
+                        isRead: false
                     )
                 ]
             }
