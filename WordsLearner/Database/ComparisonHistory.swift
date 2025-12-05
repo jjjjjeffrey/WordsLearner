@@ -16,6 +16,7 @@ nonisolated struct ComparisonHistory: Identifiable, Equatable {
     var sentence: String
     var response: String
     var date: Date
+    var isRead: Bool
 }
 
 extension ComparisonHistory.Draft: Identifiable {}

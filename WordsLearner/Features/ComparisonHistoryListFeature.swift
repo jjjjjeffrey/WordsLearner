@@ -13,27 +13,20 @@ import SwiftUI
 @Reducer
 struct ComparisonHistoryListFeature {
     @ObservableState
-    struct State: Equatable {
+    struct State {
         @ObservationStateIgnored
-        @FetchAll(
-            ComparisonHistory
-                .order { $0.date.desc() },
-            animation: .default
-        )
-        var allComparisons: [ComparisonHistory] = []
+        @Fetch(ComparisonsFetchKeyRequest(), animation: .default)
+        var comparisons = ComparisonsFetchKeyRequest.Value()
         
         var searchText: String = ""
+        var showUnreadOnly: Bool = false
         
         var filteredComparisons: [ComparisonHistory] {
-            if searchText.isEmpty {
-                return allComparisons
-            }
-            let lowercasedSearch = searchText.lowercased()
-            return allComparisons.filter {
-                $0.word1.lowercased().contains(lowercasedSearch) ||
-                $0.word2.lowercased().contains(lowercasedSearch) ||
-                $0.sentence.lowercased().contains(lowercasedSearch)
-            }
+            comparisons.comparisons
+        }
+        
+        var allComparisons: [ComparisonHistory] {
+            comparisons.allComparisons
         }
         
         @Presents var alert: AlertState<Action.Alert>?
@@ -44,6 +37,7 @@ struct ComparisonHistoryListFeature {
         case deleteComparisons(IndexSet)
         case clearAllButtonTapped
         case textChanged(String)
+        case filterToggled
         case alert(PresentationAction<Alert>)
         case delegate(Delegate)
         
@@ -62,7 +56,17 @@ struct ComparisonHistoryListFeature {
         Reduce { state, action in
             switch action {
             case let .comparisonTapped(comparison):
-                return .send(.delegate(.comparisonSelected(comparison)))
+                return .run { send in
+                    await withErrorReporting {
+                        try await database.write { db in
+                            try ComparisonHistory
+                                .where { $0.id == comparison.id }
+                                .update { $0.isRead = true }
+                                .execute(db)
+                        }
+                    }
+                    await send(.delegate(.comparisonSelected(comparison)))
+                }
             case let .deleteComparisons(indexSet):
                 let comparisons = state.filteredComparisons
                 return .run { send in
@@ -100,9 +104,12 @@ struct ComparisonHistoryListFeature {
                         }
                     }
                 }
-            case .textChanged:
-                return .none
-                
+            case let .textChanged(text):
+                state.searchText = text
+                return loadComparisons(state)
+            case .filterToggled:
+                state.showUnreadOnly.toggle()
+                return loadComparisons(state)
             case .delegate:
                 return .none
                 
@@ -111,5 +118,73 @@ struct ComparisonHistoryListFeature {
             }
         }
         .ifLet(\.$alert, action: \.alert)
+    }
+    
+    private func loadComparisons(_ state: State) -> Effect<Action> {
+        return .run { [
+            comparisons = state.$comparisons,
+            showUnreadOnly = state.showUnreadOnly,
+            searchText = state.searchText
+        ] send in
+            await loadComparisons(comparisons, showUnreadOnly: showUnreadOnly, searchText: searchText)
+        }
+    }
+    
+    private func loadComparisons(
+        _ fetch: Fetch<ComparisonsFetchKeyRequest.Value>,
+        showUnreadOnly: Bool,
+        searchText: String) async {
+            await withErrorReporting {
+                await withErrorReporting {
+                    try await fetch.load(
+                        ComparisonsFetchKeyRequest(
+                            searchText: searchText,
+                            showUnreadOnly: showUnreadOnly
+                        ),
+                        animation: Animation.default
+                    )
+                }
+            }
+    }
+}
+
+// Separate Equatable conformance to work around @Fetch property wrapper limitation
+extension ComparisonHistoryListFeature.State: Equatable {
+    static func == (lhs: ComparisonHistoryListFeature.State, rhs: ComparisonHistoryListFeature.State) -> Bool {
+        lhs.searchText == rhs.searchText &&
+        lhs.showUnreadOnly == rhs.showUnreadOnly &&
+        lhs.alert == rhs.alert
+    }
+}
+
+struct ComparisonsFetchKeyRequest: FetchKeyRequest, Equatable {
+    var searchText: String = ""
+    var showUnreadOnly: Bool = false
+    
+    struct Value: Equatable {
+        var comparisons: [ComparisonHistory] = []
+        var allComparisons: [ComparisonHistory] = []
+    }
+    
+    func fetch(_ db: Database) throws -> Value {
+        var query = ComparisonHistory.order { $0.date.desc() }
+        
+        // Filter by search text
+        if !searchText.isEmpty {
+            query = query.where {
+                $0.word1.contains(searchText) ||
+                $0.word2.contains(searchText)
+            }
+        }
+        
+        // Filter by read status
+        if showUnreadOnly {
+            query = query.where { !$0.isRead }
+        }
+        
+        return try Value(
+            comparisons: query.fetchAll(db),
+            allComparisons: ComparisonHistory.order { $0.date.desc() }.fetchAll(db)
+        )
     }
 }

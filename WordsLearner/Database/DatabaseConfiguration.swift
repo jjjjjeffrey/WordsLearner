@@ -54,9 +54,9 @@ private func createAppDatabase() throws -> any DatabaseWriter {
     
     var migrator = DatabaseMigrator()
     
-    #if DEBUG
-    migrator.eraseDatabaseOnSchemaChange = true
-    #endif
+//    #if DEBUG
+//    migrator.eraseDatabaseOnSchemaChange = true
+//    #endif
     
     // Register migrations
     migrator.registerMigration("v1.0 - Create comparisonHistories table") { db in
@@ -126,6 +126,36 @@ private func createAppDatabase() throws -> any DatabaseWriter {
             """
             CREATE INDEX "idx_backgroundTasks_createdAt" 
             ON "backgroundTasks" ("createdAt" DESC)
+            """
+        )
+        .execute(db)
+    }
+    
+    // Migration to add isRead column to comparisonHistories
+    migrator.registerMigration("v1.3 - Add isRead to comparisonHistories") { db in
+        // Add isRead column with default value 0 (false/unread)
+        try #sql(
+            """
+            ALTER TABLE "comparisonHistories" 
+            ADD COLUMN "isRead" INTEGER NOT NULL DEFAULT 0
+            """
+        )
+        .execute(db)
+        
+        // Set all existing records to unread (0)
+        try #sql(
+            """
+            UPDATE "comparisonHistories" 
+            SET "isRead" = 0
+            """
+        )
+        .execute(db)
+        
+        // Create index for efficient filtering by read status
+        try #sql(
+            """
+            CREATE INDEX "idx_comparisonHistories_isRead" 
+            ON "comparisonHistories" ("isRead")
             """
         )
         .execute(db)
@@ -208,7 +238,8 @@ extension DatabaseWriter where Self == DatabaseQueue {
                     "word2" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
                     "sentence" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
                     "response" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
-                    "date" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP
+                    "date" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP,
+                    "isRead" INTEGER NOT NULL DEFAULT 0
                 ) STRICT
                 """
             )
@@ -240,14 +271,16 @@ extension DatabaseWriter where Self == DatabaseQueue {
                         word2: "characteristic",
                         sentence: "The character of this wine is unique.",
                         response: "Test response...",
-                        date: Date()
+                        date: Date(),
+                        isRead: false
                     ),
                     ComparisonHistory.Draft(
                         word1: "affect",
                         word2: "effect",
                         sentence: "How does this affect the result?",
                         response: "Another test response...",
-                        date: Date().addingTimeInterval(-3600)
+                        date: Date().addingTimeInterval(-3600),
+                        isRead: false
                     )
                 ]
             }

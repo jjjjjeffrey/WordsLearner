@@ -56,7 +56,8 @@ struct ComparisonGenerationService {
                     word2: word2,
                     sentence: sentence,
                     response: response,
-                    date: date
+                    date: date,
+                    isRead: false
                 )
             }
             .execute(db)

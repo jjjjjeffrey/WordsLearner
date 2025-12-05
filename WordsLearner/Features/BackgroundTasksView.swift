@@ -64,7 +64,8 @@ struct BackgroundTasksView: View {
                                     word2: task.word2,
                                     sentence: task.sentence,
                                     response: task.response,
-                                    date: task.updatedAt
+                                    date: task.updatedAt,
+                                    isRead: false
                                 )
                                 store.send(.viewComparisonHistory(comparison))
                             }

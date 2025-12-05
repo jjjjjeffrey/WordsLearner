@@ -198,9 +198,6 @@ struct WordComparatorFeature {
             case .recentComparisons:
                 return .none
                 
-            case .path:
-                return .none
-                
             case .settings:
                 return .none
                 
@@ -219,5 +216,21 @@ struct WordComparatorFeature {
     }
 }
 
-extension WordComparatorFeature.Path.State: Equatable {}
+extension WordComparatorFeature.Path.State: Equatable {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        switch (lhs, rhs) {
+        case (.detail(let lhsState), .detail(let rhsState)):
+            return lhsState == rhsState
+        case (.historyList(let lhsState), .historyList(let rhsState)):
+            // Compare only equatable properties, ignoring @Fetch
+            return lhsState.searchText == rhsState.searchText &&
+                   lhsState.showUnreadOnly == rhsState.showUnreadOnly &&
+                   lhsState.alert == rhsState.alert
+        case (.backgroundTasks(let lhsState), .backgroundTasks(let rhsState)):
+            return lhsState == rhsState
+        default:
+            return false
+        }
+    }
+}
 

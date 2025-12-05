@@ -52,8 +52,17 @@ struct RecentComparisonsFeature {
                 return .none
                 
             case let .comparisonTapped(comparison):
-                return .send(.delegate(.comparisonSelected(comparison)))
-                
+                return .run { send in
+                    await withErrorReporting {
+                        try await database.write { db in
+                            try ComparisonHistory
+                                .where { $0.id == comparison.id }
+                                .update { $0.isRead = true }
+                                .execute(db)
+                        }
+                    }
+                    await send(.delegate(.comparisonSelected(comparison)))
+                }
             case let .deleteComparisons(indexSet):
                 return .run { [comparisons = state.recentComparisons] send in
                     await withErrorReporting {

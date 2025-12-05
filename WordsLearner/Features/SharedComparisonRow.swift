@@ -71,13 +71,18 @@ struct SharedComparisonRow: View {
                     }
                 }
                 
-                // Chevron
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .
-
-foregroundColor(AppColors.tertiaryText)
-                    .opacity(0.6)
+                // Unread badge and chevron
+                HStack(spacing: 6) {
+                    if !comparison.isRead {
+                        Circle()
+                            .fill(AppColors.error)
+                            .frame(width: 8, height: 8)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(AppColors.tertiaryText)
+                        .opacity(0.6)
+                }
             }
             .padding(platformPadding())
             .background(
@@ -189,7 +194,8 @@ foregroundColor(AppColors.tertiaryText)
         word2: "characteristic",
         sentence: "The character of this wine is unique and shows the winery's attention to detail.",
         response: "Sample response",
-        date: Date()
+        date: Date(),
+        isRead: false
     )
     
     VStack(spacing: 8) {
@@ -200,7 +206,8 @@ foregroundColor(AppColors.tertiaryText)
                 word2: sampleComparison.word2,
                 sentence: sampleComparison.sentence,
                 response: sampleComparison.response,
-                date: sampleComparison.date
+                date: sampleComparison.date,
+                isRead: false
             )
         ) {
             print("Tapped")
@@ -213,7 +220,8 @@ foregroundColor(AppColors.tertiaryText)
                 word2: "effect",
                 sentence: "How does this change affect the final result?",
                 response: "Another response",
-                date: Date().addingTimeInterval(-3600)
+                date: Date().addingTimeInterval(-3600),
+                isRead: true
             )
         ) {
             print("Tapped 2")
