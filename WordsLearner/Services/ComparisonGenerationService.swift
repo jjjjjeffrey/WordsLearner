@@ -129,66 +129,69 @@ extension ComparisonGenerationServiceClient: DependencyKey {
     static let testValue = Self(
         generateComparison: { _, _, _ in
             AsyncThrowingStream { continuation in
-                let message =
-                """
-                ## Understanding "Character" and "Characteristic"
+                Task {
+                    let message =
+                    """
+                    ## Understanding "Character" and "Characteristic"
 
-                ### Simple Stories
+                    ### Simple Stories
 
-                #### Story 1: "Character"
-                Once upon a time, in a small town, there was a kind girl named Lily. Everyone said that her **character** was special. She always helped others and shared her toys. One day, she saw a little boy crying because he lost his puppy. Lily ran to him and said, "Don't worry! Let's find your puppy together." Because of her good **character**, everyone loved Lily. She was not just a nice girl; her **character** showed that she cared for others.
+                    #### Story 1: "Character"
+                    Once upon a time, in a small town, there was a kind girl named Lily. Everyone said that her **character** was special. She always helped others and shared her toys. One day, she saw a little boy crying because he lost his puppy. Lily ran to him and said, "Don't worry! Let's find your puppy together." Because of her good **character**, everyone loved Lily. She was not just a nice girl; her **character** showed that she cared for others.
 
-                #### Story 2: "Characteristic"
-                In the same town, there was a tall tree in the park. This tree had many **characteristics**. It had green leaves, a thick trunk, and beautiful flowers. Every spring, the tree would bloom with bright pink flowers. The tall tree’s main **characteristic** was its height. All the children loved to play under it because it provided shade. The tree’s **characteristics** made it special, just like Lily’s **character** made her special.
+                    #### Story 2: "Characteristic"
+                    In the same town, there was a tall tree in the park. This tree had many **characteristics**. It had green leaves, a thick trunk, and beautiful flowers. Every spring, the tree would bloom with bright pink flowers. The tall tree’s main **characteristic** was its height. All the children loved to play under it because it provided shade. The tree’s **characteristics** made it special, just like Lily’s **character** made her special.
 
-                ### Key Difference
-                The key difference between **character** and **characteristic** is that **character** refers to the moral qualities of a person, while **characteristic** refers to a feature or trait that describes something.
+                    ### Key Difference
+                    The key difference between **character** and **characteristic** is that **character** refers to the moral qualities of a person, while **characteristic** refers to a feature or trait that describes something.
 
-                ### Background Information
-                - **Character** comes from the Greek word "kharaktēr," meaning a mark or engraving. Over time, it has come to mean the moral qualities of a person.
-                - **Characteristic** comes from the Greek word "kharakteristikos," meaning something that describes a person or thing.
+                    ### Background Information
+                    - **Character** comes from the Greek word "kharaktēr," meaning a mark or engraving. Over time, it has come to mean the moral qualities of a person.
+                    - **Characteristic** comes from the Greek word "kharakteristikos," meaning something that describes a person or thing.
 
-                ### Vocabulary Meaning
-                - **Character**: The moral qualities or nature of a person.
-                - **Characteristic**: A feature or trait that helps to describe something.
+                    ### Vocabulary Meaning
+                    - **Character**: The moral qualities or nature of a person.
+                    - **Characteristic**: A feature or trait that helps to describe something.
 
-                ### Example Sentences
+                    ### Example Sentences
 
-                1. My friend has a friendly **character** that everyone enjoys.
-                2. Can you tell me one **characteristic** of your favorite animal?
-                3. Lily showed her good **character** when she helped the lost puppy.
-                4. The **characteristic** of this fruit is its sweet taste.
-                5. He has a strong **character** because he always does what is right.
-                6. What is the main **characteristic** of a good friend?
-                7. Her **character** shines brightly in difficult times.
-                8. One **characteristic** of cats is that they love to sleep a lot.
-                9. The teacher praised her for her caring **character**.
-                10. Is being brave an important **characteristic** for a hero?
+                    1. My friend has a friendly **character** that everyone enjoys.
+                    2. Can you tell me one **characteristic** of your favorite animal?
+                    3. Lily showed her good **character** when she helped the lost puppy.
+                    4. The **characteristic** of this fruit is its sweet taste.
+                    5. He has a strong **character** because he always does what is right.
+                    6. What is the main **characteristic** of a good friend?
+                    7. Her **character** shines brightly in difficult times.
+                    8. One **characteristic** of cats is that they love to sleep a lot.
+                    9. The teacher praised her for her caring **character**.
+                    10. Is being brave an important **characteristic** for a hero?
 
-                ### Interchangeability
-                - You can use **character** and **characteristic** in some situations where they seem to describe something about a person or thing, but they are not always interchangeable. For example:
-                  - "The **character** of this wine is unique." (This means the overall quality or nature of the wine.)
-                  - "The **characteristic** of this wine is its fruity flavor." (This describes a specific feature of the wine.)
+                    ### Interchangeability
+                    - You can use **character** and **characteristic** in some situations where they seem to describe something about a person or thing, but they are not always interchangeable. For example:
+                      - "The **character** of this wine is unique." (This means the overall quality or nature of the wine.)
+                      - "The **characteristic** of this wine is its fruity flavor." (This describes a specific feature of the wine.)
 
-                In the sentence "The **character** of this wine is unique," you cannot replace **character** with **characteristic** without changing the meaning. 
+                    In the sentence "The **character** of this wine is unique," you cannot replace **character** with **characteristic** without changing the meaning. 
 
-                - **Use of both in a similar context**: "The **character** of this park is peaceful," vs. "The **characteristic** of this park is its quietness." Here, both sentences talk about the park but in different ways.
+                    - **Use of both in a similar context**: "The **character** of this park is peaceful," vs. "The **characteristic** of this park is its quietness." Here, both sentences talk about the park but in different ways.
 
-                ### Conclusion
-                Remember, **character** is about a person's nature, while **characteristic** is about the features or traits of something.
-                """
-                let words = message.split(separator: " ", omittingEmptySubsequences: false)
-                for (index, word) in words.enumerated() {
-                    // Re-add a space after each word except the last one
-                    let yieldString: String
-                    if index < words.count - 1 {
-                        yieldString = word + " "
-                    } else {
-                        yieldString = String(word)
+                    ### Conclusion
+                    Remember, **character** is about a person's nature, while **characteristic** is about the features or traits of something.
+                    """
+                    let words = message.split(separator: " ", omittingEmptySubsequences: false)
+                    for (index, word) in words.enumerated() {
+                        // Re-add a space after each word except the last one
+                        let yieldString: String
+                        if index < words.count - 1 {
+                            yieldString = word + " "
+                        } else {
+                            yieldString = String(word)
+                        }
+                        continuation.yield(yieldString)
+                        try? await Task.sleep(nanoseconds: 60_000_000) // 60ms lag
                     }
-                    continuation.yield(yieldString)
+                    continuation.finish()
                 }
-                continuation.finish()
             }
         },
         saveToHistory: { _, _, _, _, _ in }
