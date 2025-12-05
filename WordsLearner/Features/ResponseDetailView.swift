@@ -190,6 +190,10 @@ struct ResponseDetailView: View {
                     ResponseDetailFeature()
                 }
             )
+            #if os(macOS)
+            .frame(minWidth: 900, idealWidth: 1000, maxWidth: 1200, minHeight: 560, idealHeight: 800, maxHeight: .infinity)
+            .padding(32)
+            #endif
         }
     }
 }
