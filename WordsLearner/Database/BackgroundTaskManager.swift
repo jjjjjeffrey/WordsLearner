@@ -91,6 +91,25 @@ actor BackgroundTaskManager {
         }
     }
     
+    /// Regenerate a failed task by resetting it to pending status
+    func regenerateTask(taskId: UUID) async throws {
+        logger.info("Regenerating task: \(taskId)")
+        
+        try await database.write { db in
+            try BackgroundTask
+                .where { $0.id == taskId }
+                .update {
+                    $0.status = BackgroundTask.Status.pending.rawValue
+                    $0.error = nil
+                    $0.response = ""
+                    $0.updatedAt = Date()
+                }
+                .execute(db)
+        }
+        
+        logger.info("Task \(taskId) reset to pending status")
+    }
+    
     // MARK: - Private Processing Logic
     
     private func processTasksLoop() async {
@@ -237,6 +256,7 @@ struct BackgroundTaskManagerClient {
     var getCurrentTaskId: @Sendable () async -> UUID?
     var isProcessing: @Sendable () async -> Bool
     var getPendingTasksCount: @Sendable () async throws -> Int
+    var regenerateTask: @Sendable (UUID) async throws -> Void
 }
 
 extension BackgroundTaskManagerClient: DependencyKey {
@@ -262,7 +282,10 @@ extension BackgroundTaskManagerClient: DependencyKey {
             },
             getCurrentTaskId: { await manager.getCurrentTaskId() },
             isProcessing: { await manager.isProcessing() },
-            getPendingTasksCount: { try await manager.getPendingTasksCount() }
+            getPendingTasksCount: { try await manager.getPendingTasksCount() },
+            regenerateTask: { taskId in
+                try await manager.regenerateTask(taskId: taskId)
+            }
         )
     }()
     
@@ -272,7 +295,8 @@ extension BackgroundTaskManagerClient: DependencyKey {
         addTask: { _, _, _ in },
         getCurrentTaskId: { nil },
         isProcessing: { false },
-        getPendingTasksCount: { 0 }
+        getPendingTasksCount: { 0 },
+        regenerateTask: { _ in }
     )
 }
 

@@ -69,6 +69,9 @@ struct BackgroundTasksView: View {
                                 )
                                 store.send(.viewComparisonHistory(comparison))
                             }
+                        },
+                        onRegenerate: {
+                            store.send(.regenerateTask(task.id))
                         }
                     )
                 }

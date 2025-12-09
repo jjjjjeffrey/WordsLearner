@@ -11,46 +11,56 @@ struct BackgroundTaskRow: View {
     let task: BackgroundTask
     let onRemove: () -> Void
     var onTap: (() -> Void)? = nil
+    var onRegenerate: (() -> Void)? = nil
     
     var body: some View {
-        Button {
-            onTap?()
-        } label: {
-            HStack(spacing: 12) {
-                statusIcon
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(task.word1)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(AppColors.word1Color)
-                        
-                        Text("vs")
-                            .font(.caption2)
-                            .foregroundColor(AppColors.secondaryText)
-                        
-                        Text(task.word2)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(AppColors.word2Color)
-                    }
+        HStack(spacing: 12) {
+            statusIcon
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(task.word1)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(AppColors.word1Color)
                     
-                    Text(task.sentence)
-                        .font(.caption)
+                    Text("vs")
+                        .font(.caption2)
                         .foregroundColor(AppColors.secondaryText)
-                        .lineLimit(1)
                     
-                    if let error = task.error {
-                        Text(error)
-                            .font(.caption2)
-                            .foregroundColor(AppColors.error)
-                            .lineLimit(1)
-                    }
+                    Text(task.word2)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(AppColors.word2Color)
                 }
                 
-                Spacer()
+                Text(task.sentence)
+                    .font(.caption)
+                    .foregroundColor(AppColors.secondaryText)
+                    .lineLimit(1)
                 
-                if task.taskStatus == .completed || task.taskStatus == .failed {
+                if let error = task.error {
+                    Text(error)
+                        .font(.caption2)
+                        .foregroundColor(AppColors.error)
+                        .lineLimit(1)
+                }
+            }
+            
+            Spacer()
+            
+            if task.taskStatus == .completed || task.taskStatus == .failed {
+                HStack(spacing: 8) {
+                    if task.taskStatus == .failed, let onRegenerate = onRegenerate {
+                        Button {
+                            onRegenerate()
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundColor(AppColors.primary)
+                                .font(.title3)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    
                     Button {
                         onRemove()
                     } label: {
@@ -61,14 +71,18 @@ struct BackgroundTaskRow: View {
                     .buttonStyle(PlainButtonStyle())
                 }
             }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(backgroundColorForStatus)
-            )
         }
-        .buttonStyle(PlainButtonStyle())
-        .disabled(task.taskStatus != .completed)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(backgroundColorForStatus)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if task.taskStatus == .completed {
+                onTap?()
+            }
+        }
     }
     
     @ViewBuilder

@@ -47,6 +47,7 @@ struct BackgroundTasksFeature {
         case syncCurrentTaskId
         case currentTaskIdUpdated(UUID?)
         case removeTask(UUID)
+        case regenerateTask(UUID)
         case clearCompletedTasks
         case clearAllTasks
         case viewComparisonHistory(ComparisonHistory)
@@ -91,6 +92,13 @@ struct BackgroundTasksFeature {
                                 .delete()
                                 .execute(db)
                         }
+                    }
+                }
+                
+            case let .regenerateTask(taskId):
+                return .run { send in
+                    await withErrorReporting {
+                        try await taskManager.regenerateTask(taskId)
                     }
                 }
                 
