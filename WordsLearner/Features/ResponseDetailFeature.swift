@@ -22,19 +22,18 @@ struct ResponseDetailFeature {
         var shouldStartStreaming: Bool = true
     }
     
-    enum Action {
+    enum Action: Equatable {
         case onAppear
         case startStreaming
         case streamChunkReceived(String)
         case streamCompleted
-        case streamFailed(Error)
+        case streamFailed(String)
         case shareButtonTapped
         case comparisonSaved
-        case comparisonSaveFailed(Error)
+        case comparisonSaveFailed(String)
     }
     
     @Dependency(\.comparisonGenerator) var generator
-    @Dependency(\.date.now) var now
     
     var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -54,7 +53,7 @@ struct ResponseDetailFeature {
                         }
                         await send(.streamCompleted)
                     } catch {
-                        await send(.streamFailed(error))
+                        await send(.streamFailed(error.localizedDescription))
                     }
                 }
                 
@@ -65,8 +64,9 @@ struct ResponseDetailFeature {
             case .streamCompleted:
                 state.isStreaming = false
                 
-                return .run { [word1 = state.word1, word2 = state.word2, sentence = state.sentence, response = state.streamingResponse, now] send in
+                return .run { [word1 = state.word1, word2 = state.word2, sentence = state.sentence, response = state.streamingResponse] send in
                     do {
+                        @Dependency(\.date.now) var now
                         try await generator.saveToHistory(
                             word1,
                             word2,
@@ -76,20 +76,20 @@ struct ResponseDetailFeature {
                         )
                         await send(.comparisonSaved)
                     } catch {
-                        await send(.comparisonSaveFailed(error))
+                        await send(.comparisonSaveFailed(error.localizedDescription))
                     }
                 }
                 
             case .comparisonSaved:
                 return .none
                 
-            case let .comparisonSaveFailed(error):
-                state.errorMessage = "Failed to save comparison: \(error.localizedDescription)"
+            case let .comparisonSaveFailed(errorMessage):
+                state.errorMessage = "Failed to save comparison: \(errorMessage)"
                 return .none
                 
-            case let .streamFailed(error):
+            case let .streamFailed(errorMessage):
                 state.isStreaming = false
-                state.errorMessage = error.localizedDescription
+                state.errorMessage = errorMessage
                 return .none
                 
             case .shareButtonTapped:
