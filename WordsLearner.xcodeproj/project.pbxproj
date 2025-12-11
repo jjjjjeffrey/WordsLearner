@@ -11,6 +11,7 @@
 		0012AB3B2ECC382F003E40E4 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 0012AB3A2ECC382F003E40E4 /* SQLiteData */; };
 		0012AB3D2ECC382F003E40E4 /* SQLiteDataTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 0012AB3C2ECC382F003E40E4 /* SQLiteDataTestSupport */; };
 		00B953392EC59D4600D80764 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 00B953382EC59D4600D80764 /* Markdown */; };
+		00BD286C2EE940B100E07F4F /* DependenciesTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 00BD286B2EE940B100E07F4F /* DependenciesTestSupport */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +71,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0012AB3D2ECC382F003E40E4 /* SQLiteDataTestSupport in Frameworks */,
+				00BD286C2EE940B100E07F4F /* DependenciesTestSupport in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -89,6 +91,7 @@
 				0051EDCA2EC44A8D008DB61F /* WordsLearner */,
 				0051EDD82EC44A90008DB61F /* WordsLearnerTests */,
 				0051EDE22EC44A90008DB61F /* WordsLearnerUITests */,
+				00BD27EA2EE93A2100E07F4F /* Frameworks */,
 				0051EDC92EC44A8D008DB61F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -101,6 +104,13 @@
 				0051EDDF2EC44A90008DB61F /* WordsLearnerUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		00BD27EA2EE93A2100E07F4F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -150,6 +160,7 @@
 			name = WordsLearnerTests;
 			packageProductDependencies = (
 				0012AB3C2ECC382F003E40E4 /* SQLiteDataTestSupport */,
+				00BD286B2EE940B100E07F4F /* DependenciesTestSupport */,
 			);
 			productName = WordsLearnerTests;
 			productReference = 0051EDD52EC44A90008DB61F /* WordsLearnerTests.xctest */;
@@ -214,6 +225,7 @@
 				00B953372EC59D4600D80764 /* XCRemoteSwiftPackageReference "swift-markdown" */,
 				0012AB362ECC37DD003E40E4 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */,
 				0012AB392ECC382F003E40E4 /* XCRemoteSwiftPackageReference "sqlite-data" */,
+				00BD286A2EE940B100E07F4F /* XCRemoteSwiftPackageReference "swift-dependencies" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0051EDC92EC44A8D008DB61F /* Products */;
@@ -632,6 +644,14 @@
 				minimumVersion = 0.7.3;
 			};
 		};
+		00BD286A2EE940B100E07F4F /* XCRemoteSwiftPackageReference "swift-dependencies" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-dependencies";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.10.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -654,6 +674,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 00B953372EC59D4600D80764 /* XCRemoteSwiftPackageReference "swift-markdown" */;
 			productName = Markdown;
+		};
+		00BD286B2EE940B100E07F4F /* DependenciesTestSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 00BD286A2EE940B100E07F4F /* XCRemoteSwiftPackageReference "swift-dependencies" */;
+			productName = DependenciesTestSupport;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

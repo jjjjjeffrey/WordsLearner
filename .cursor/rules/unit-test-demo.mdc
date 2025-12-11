@@ -1,0 +1,1141 @@
+---
+description: Following this rule when writing unit test.
+alwaysApply: false
+---
+import ComposableArchitecture
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct AlertsAndConfirmationDialogsTests {
+  @Test
+  func alert() async {
+    let store = TestStore(initialState: AlertAndConfirmationDialog.State()) {
+      AlertAndConfirmationDialog()
+    }
+
+    await store.send(.alertButtonTapped) {
+      $0.alert = AlertState {
+        TextState("Alert!")
+      } actions: {
+        ButtonState(role: .cancel) {
+          TextState("Cancel")
+        }
+        ButtonState(action: .incrementButtonTapped) {
+          TextState("Increment")
+        }
+      } message: {
+        TextState("This is an alert")
+      }
+    }
+    await store.send(\.alert.incrementButtonTapped) {
+      $0.alert = AlertState { TextState("Incremented!") }
+      $0.count = 1
+    }
+    await store.send(\.alert.dismiss) {
+      $0.alert = nil
+    }
+  }
+
+  @Test
+  func confirmationDialog() async {
+    let store = TestStore(initialState: AlertAndConfirmationDialog.State()) {
+      AlertAndConfirmationDialog()
+    }
+
+    await store.send(.confirmationDialogButtonTapped) {
+      $0.confirmationDialog = ConfirmationDialogState {
+        TextState("Confirmation dialog")
+      } actions: {
+        ButtonState(role: .cancel) {
+          TextState("Cancel")
+        }
+        ButtonState(action: .incrementButtonTapped) {
+          TextState("Increment")
+        }
+        ButtonState(action: .decrementButtonTapped) {
+          TextState("Decrement")
+        }
+      } message: {
+        TextState("This is a confirmation dialog.")
+      }
+    }
+    await store.send(\.confirmationDialog.incrementButtonTapped) {
+      $0.alert = AlertState { TextState("Incremented!") }
+      $0.confirmationDialog = nil
+      $0.count = 1
+    }
+  }
+}
+
+import Clocks
+import ComposableArchitecture
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct AnimationTests {
+  @Test
+  func rainbow() async {
+    let clock = TestClock()
+
+    let store = TestStore(initialState: Animations.State()) {
+      Animations()
+    } withDependencies: {
+      $0.continuousClock = clock
+    }
+
+    await store.send(.rainbowButtonTapped)
+    await store.receive(\.setColor) {
+      $0.circleColor = .red
+    }
+
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
+      $0.circleColor = .blue
+    }
+
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
+      $0.circleColor = .green
+    }
+
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
+      $0.circleColor = .orange
+    }
+
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
+      $0.circleColor = .pink
+    }
+
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
+      $0.circleColor = .purple
+    }
+
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
+      $0.circleColor = .yellow
+    }
+
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
+      $0.circleColor = .black
+    }
+
+    await clock.run(timeout: .seconds(7))
+  }
+
+  @Test
+  func reset() async {
+    let clock = TestClock()
+
+    let store = TestStore(initialState: Animations.State()) {
+      Animations()
+    } withDependencies: {
+      $0.continuousClock = clock
+    }
+
+    await store.send(.rainbowButtonTapped)
+    await store.receive(\.setColor) {
+      $0.circleColor = .red
+    }
+
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
+      $0.circleColor = .blue
+    }
+
+    await store.send(.resetButtonTapped) {
+      $0.alert = AlertState {
+        TextState("Reset state?")
+      } actions: {
+        ButtonState(
+          role: .destructive,
+          action: .send(.resetConfirmationButtonTapped, animation: .default)
+        ) {
+          TextState("Reset")
+        }
+        ButtonState(role: .cancel) {
+          TextState("Cancel")
+        }
+      }
+    }
+
+    await store.send(\.alert.resetConfirmationButtonTapped) {
+      $0 = Animations.State()
+    }
+
+    await store.finish()
+  }
+}
+
+import ComposableArchitecture
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct BindingFormTests {
+  @Test
+  func basics() async {
+    let store = TestStore(initialState: BindingForm.State()) {
+      BindingForm()
+    }
+
+    await store.send(\.binding.sliderValue, 2) {
+      $0.sliderValue = 2
+    }
+    await store.send(\.binding.stepCount, 1) {
+      $0.sliderValue = 1
+      $0.stepCount = 1
+    }
+    await store.send(\.binding.text, "Blob") {
+      $0.text = "Blob"
+    }
+    await store.send(\.binding.toggleIsOn, true) {
+      $0.toggleIsOn = true
+    }
+    await store.send(.resetButtonTapped) {
+      $0 = BindingForm.State(sliderValue: 5, stepCount: 10, text: "", toggleIsOn: false)
+    }
+  }
+}
+
+import ComposableArchitecture
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct SharedStateFileStorageTests {
+  @Test
+  func tabSelection() async {
+    let store = TestStore(initialState: SharedStateFileStorage.State()) {
+      SharedStateFileStorage()
+    }
+
+    await store.send(.selectTab(.profile)) {
+      $0.currentTab = .profile
+    }
+    await store.send(.selectTab(.counter)) {
+      $0.currentTab = .counter
+    }
+  }
+
+  @Test
+  func sharedCounts() async {
+    let store = TestStore(initialState: SharedStateFileStorage.State()) {
+      SharedStateFileStorage()
+    }
+
+    await store.send(\.counter.incrementButtonTapped) {
+      $0.counter.$stats.withLock { $0.increment() }
+    }
+
+    await store.send(\.counter.decrementButtonTapped) {
+      $0.counter.$stats.withLock { $0.decrement() }
+    }
+
+    await store.send(\.profile.resetStatsButtonTapped) {
+      $0.profile.$stats.withLock { $0 = Stats() }
+    }
+  }
+
+  @Test
+  func alert() async {
+    let store = TestStore(initialState: SharedStateFileStorage.State()) {
+      SharedStateFileStorage()
+    }
+
+    await store.send(\.counter.isPrimeButtonTapped) {
+      $0.counter.alert = AlertState {
+        TextState("👎 The number 0 is not prime :(")
+      }
+    }
+  }
+}
+
+import ComposableArchitecture
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct SharedStateInMemoryTests {
+  @Test
+  func tabSelection() async {
+    let store = TestStore(initialState: SharedStateInMemory.State()) {
+      SharedStateInMemory()
+    }
+
+    await store.send(.selectTab(.profile)) {
+      $0.currentTab = .profile
+    }
+    await store.send(.selectTab(.counter)) {
+      $0.currentTab = .counter
+    }
+  }
+
+  @Test
+  func sharedCounts() async {
+    let store = TestStore(initialState: SharedStateInMemory.State()) {
+      SharedStateInMemory()
+    }
+
+    await store.send(.counter(.incrementButtonTapped)) {
+      $0.counter.$stats.withLock { $0.increment() }
+    }
+
+    await store.send(.counter(.decrementButtonTapped)) {
+      $0.counter.$stats.withLock { $0.decrement() }
+    }
+
+    await store.send(.profile(.resetStatsButtonTapped)) {
+      $0.profile.$stats.withLock { $0 = Stats() }
+    }
+  }
+
+  @Test
+  func alert() async {
+    let store = TestStore(initialState: SharedStateInMemory.State()) {
+      SharedStateInMemory()
+    }
+
+    await store.send(.counter(.isPrimeButtonTapped)) {
+      $0.counter.alert = AlertState {
+        TextState("👎 The number 0 is not prime :(")
+      }
+    }
+  }
+}
+
+import ComposableArchitecture
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct SharedStateUserDefaultsTests {
+  @Test
+  func tabSelection() async {
+    let store = TestStore(initialState: SharedStateUserDefaults.State()) {
+      SharedStateUserDefaults()
+    }
+
+    await store.send(.selectTab(.profile)) {
+      $0.currentTab = .profile
+    }
+    await store.send(.selectTab(.counter)) {
+      $0.currentTab = .counter
+    }
+  }
+
+  @Test
+  func sharedCounts() async {
+    let store = TestStore(initialState: SharedStateUserDefaults.State()) {
+      SharedStateUserDefaults()
+    }
+
+    await store.send(.counter(.incrementButtonTapped)) {
+      $0.counter.$count.withLock { $0 = 1 }
+    }
+
+    await store.send(.counter(.decrementButtonTapped)) {
+      $0.counter.$count.withLock { $0 = 0 }
+    }
+
+    await store.send(.profile(.resetStatsButtonTapped)) {
+      $0.profile.$count.withLock { $0 = 0 }
+    }
+  }
+
+  @Test
+  func alert() async {
+    let store = TestStore(initialState: SharedStateUserDefaults.State()) {
+      SharedStateUserDefaults()
+    }
+
+    await store.send(.counter(.isPrimeButtonTapped)) {
+      $0.counter.alert = AlertState {
+        TextState("👎 The number 0 is not prime :(")
+      }
+    }
+  }
+}
+
+import ComposableArchitecture
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct EffectsBasicsTests {
+  @Test
+  func countDown() async {
+    let store = TestStore(initialState: EffectsBasics.State()) {
+      EffectsBasics()
+    } withDependencies: {
+      $0.continuousClock = ImmediateClock()
+    }
+
+    await store.send(.incrementButtonTapped) {
+      $0.count = 1
+    }
+    await store.send(.decrementButtonTapped) {
+      $0.count = 0
+    }
+  }
+
+  @Test
+  func numberFact() async {
+    let store = TestStore(initialState: EffectsBasics.State()) {
+      EffectsBasics()
+    } withDependencies: {
+      $0.factClient.fetch = { "\($0) is a good number Brent" }
+      $0.continuousClock = ImmediateClock()
+    }
+
+    await store.send(.incrementButtonTapped) {
+      $0.count = 1
+    }
+    await store.send(.numberFactButtonTapped) {
+      $0.isNumberFactRequestInFlight = true
+    }
+    await store.receive(\.numberFactResponse.success) {
+      $0.isNumberFactRequestInFlight = false
+      $0.numberFact = "1 is a good number Brent"
+    }
+  }
+
+  @Test
+  func decrement() async {
+    let store = TestStore(initialState: EffectsBasics.State()) {
+      EffectsBasics()
+    } withDependencies: {
+      $0.continuousClock = ImmediateClock()
+    }
+
+    await store.send(.decrementButtonTapped) {
+      $0.count = -1
+    }
+    await store.receive(\.decrementDelayResponse) {
+      $0.count = 0
+    }
+  }
+
+  @Test
+  func decrementCancellation() async {
+    let store = TestStore(initialState: EffectsBasics.State()) {
+      EffectsBasics()
+    } withDependencies: {
+      $0.continuousClock = TestClock()
+    }
+
+    await store.send(.decrementButtonTapped) {
+      $0.count = -1
+    }
+    await store.send(.incrementButtonTapped) {
+      $0.count = 0
+    }
+  }
+}
+
+import ComposableArchitecture
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct EffectsCancellationTests {
+  @Test
+  func successfulRequest() async {
+    let store = TestStore(initialState: EffectsCancellation.State()) {
+      EffectsCancellation()
+    } withDependencies: {
+      $0.factClient.fetch = { "\($0) is a good number Brent" }
+    }
+
+    await store.send(.stepperChanged(1)) {
+      $0.count = 1
+    }
+    await store.send(.stepperChanged(0)) {
+      $0.count = 0
+    }
+    await store.send(.factButtonTapped) {
+      $0.isFactRequestInFlight = true
+    }
+    await store.receive(\.factResponse.success) {
+      $0.currentFact = "0 is a good number Brent"
+      $0.isFactRequestInFlight = false
+    }
+  }
+
+  @Test
+  func failedRequest() async {
+    struct FactError: Equatable, Error {}
+    let store = TestStore(initialState: EffectsCancellation.State()) {
+      EffectsCancellation()
+    } withDependencies: {
+      $0.factClient.fetch = { _ in throw FactError() }
+    }
+
+    await store.send(.factButtonTapped) {
+      $0.isFactRequestInFlight = true
+    }
+    await store.receive(\.factResponse.failure) {
+      $0.isFactRequestInFlight = false
+    }
+  }
+
+  // NB: This tests that the cancel button really does cancel the in-flight API request.
+  //
+  // To see the real power of this test, try replacing the `.cancel` effect with a `.none` effect
+  // in the `.cancelButtonTapped` action of the `effectsCancellationReducer`. This will cause the
+  // test to fail, showing that we are exhaustively asserting that the effect truly is canceled and
+  // will never emit.
+  @Test
+  func cancelButtonCancelsRequest() async {
+    let store = TestStore(initialState: EffectsCancellation.State()) {
+      EffectsCancellation()
+    } withDependencies: {
+      $0.factClient.fetch = { _ in try await Task.never() }
+    }
+
+    await store.send(.factButtonTapped) {
+      $0.isFactRequestInFlight = true
+    }
+    await store.send(.cancelButtonTapped) {
+      $0.isFactRequestInFlight = false
+    }
+  }
+
+  @Test
+  func plusMinusButtonsCancelsRequest() async {
+    let store = TestStore(initialState: EffectsCancellation.State()) {
+      EffectsCancellation()
+    } withDependencies: {
+      $0.factClient.fetch = { _ in try await Task.never() }
+    }
+
+    await store.send(.factButtonTapped) {
+      $0.isFactRequestInFlight = true
+    }
+    await store.send(.stepperChanged(1)) {
+      $0.count = 1
+      $0.isFactRequestInFlight = false
+    }
+  }
+}
+
+import ComposableArchitecture
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct LongLivingEffectsTests {
+  @Test
+  func basics() async {
+    let (screenshots, takeScreenshot) = AsyncStream.makeStream(of: Void.self)
+
+    let store = TestStore(initialState: LongLivingEffects.State()) {
+      LongLivingEffects()
+    } withDependencies: {
+      $0.screenshots = { screenshots }
+    }
+
+    let task = await store.send(.task)
+
+    // Simulate a screenshot being taken
+    takeScreenshot.yield()
+
+    await store.receive(\.userDidTakeScreenshotNotification) {
+      $0.screenshotCount = 1
+    }
+
+    // Simulate screen going away
+    await task.cancel()
+
+    // Simulate a screenshot being taken to show no effects are executed.
+    takeScreenshot.yield()
+  }
+}
+
+import ComposableArchitecture
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct RefreshableTests {
+  @Test
+  func happyPath() async {
+    let store = TestStore(initialState: Refreshable.State()) {
+      Refreshable()
+    } withDependencies: {
+      $0.factClient.fetch = { "\($0) is a good number." }
+      $0.continuousClock = ImmediateClock()
+    }
+
+    await store.send(.incrementButtonTapped) {
+      $0.count = 1
+    }
+    await store.send(.refresh)
+    await store.receive(\.factResponse.success) {
+      $0.fact = "1 is a good number."
+    }
+  }
+
+  @Test
+  func unhappyPath() async {
+    struct FactError: Equatable, Error {}
+
+    let store = TestStore(initialState: Refreshable.State()) {
+      Refreshable()
+    } withDependencies: {
+      $0.factClient.fetch = { _ in throw FactError() }
+      $0.continuousClock = ImmediateClock()
+    }
+
+    await store.send(.incrementButtonTapped) {
+      $0.count = 1
+    }
+    await store.send(.refresh)
+    await store.receive(\.factResponse.failure)
+  }
+
+  @Test
+  func cancellation() async {
+    let store = TestStore(initialState: Refreshable.State()) {
+      Refreshable()
+    } withDependencies: {
+      $0.factClient.fetch = {
+        try await Task.sleep(for: .seconds(1))
+        return "\($0) is a good number."
+      }
+      $0.continuousClock = ImmediateClock()
+    }
+
+    await store.send(.incrementButtonTapped) {
+      $0.count = 1
+    }
+    await store.send(.refresh)
+    await store.send(.cancelButtonTapped)
+  }
+}
+
+import ComposableArchitecture
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct TimersTests {
+  @Test
+  func basics() async {
+    let clock = TestClock()
+
+    let store = TestStore(initialState: Timers.State()) {
+      Timers()
+    } withDependencies: {
+      $0.continuousClock = clock
+    }
+
+    await store.send(.toggleTimerButtonTapped) {
+      $0.isTimerActive = true
+    }
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.timerTicked) {
+      $0.secondsElapsed = 1
+    }
+    await clock.advance(by: .seconds(5))
+    await store.receive(\.timerTicked) {
+      $0.secondsElapsed = 2
+    }
+    await store.receive(\.timerTicked) {
+      $0.secondsElapsed = 3
+    }
+    await store.receive(\.timerTicked) {
+      $0.secondsElapsed = 4
+    }
+    await store.receive(\.timerTicked) {
+      $0.secondsElapsed = 5
+    }
+    await store.receive(\.timerTicked) {
+      $0.secondsElapsed = 6
+    }
+    await store.send(.toggleTimerButtonTapped) {
+      $0.isTimerActive = false
+    }
+  }
+}
+
+import ComposableArchitecture
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct WebSocketTests {
+  @Test
+  func happyPath() async {
+    let actions = AsyncStream.makeStream(of: WebSocketClient.Action.self)
+    let messages = AsyncStream.makeStream(of: Result<WebSocketClient.Message, any Error>.self)
+
+    let store = TestStore(initialState: WebSocket.State()) {
+      WebSocket()
+    } withDependencies: {
+      $0.continuousClock = ImmediateClock()
+      $0.webSocket.open = { @Sendable _, _, _ in actions.stream }
+      $0.webSocket.receive = { @Sendable _ in messages.stream }
+      $0.webSocket.send = { @Sendable _, _ in }
+      $0.webSocket.sendPing = { @Sendable _ in try await Task.never() }
+    }
+
+    // Connect to the socket
+    await store.send(.connectButtonTapped) {
+      $0.connectivityState = .connecting
+    }
+    actions.continuation.yield(.didOpen(protocol: nil))
+    await store.receive(\.webSocket.didOpen) {
+      $0.connectivityState = .connected
+    }
+
+    // Receive a message
+    messages.continuation.yield(.success(.string("Welcome to echo.pointfree.co")))
+    await store.receive(\.receivedSocketMessage.success) {
+      $0.receivedMessages = ["Welcome to echo.pointfree.co"]
+    }
+
+    // Send a message
+    await store.send(.messageToSendChanged("Hi")) {
+      $0.messageToSend = "Hi"
+    }
+    await store.send(.sendButtonTapped) {
+      $0.messageToSend = ""
+    }
+    await store.receive(\.sendResponse)
+
+    // Receive a message
+    messages.continuation.yield(.success(.string("Hi")))
+    await store.receive(\.receivedSocketMessage.success) {
+      $0.receivedMessages = ["Welcome to echo.pointfree.co", "Hi"]
+    }
+
+    // Disconnect from the socket
+    await store.send(.connectButtonTapped) {
+      $0.connectivityState = .disconnected
+    }
+    await store.finish()
+  }
+
+  @Test
+  func sendFailure() async {
+    let actions = AsyncStream.makeStream(of: WebSocketClient.Action.self)
+    let messages = AsyncStream.makeStream(of: Result<WebSocketClient.Message, any Error>.self)
+
+    let store = TestStore(initialState: WebSocket.State()) {
+      WebSocket()
+    } withDependencies: {
+      $0.continuousClock = ImmediateClock()
+      $0.webSocket.open = { @Sendable _, _, _ in actions.stream }
+      $0.webSocket.receive = { @Sendable _ in messages.stream }
+      $0.webSocket.send = { @Sendable _, _ in
+        struct SendFailure: Error, Equatable {}
+        throw SendFailure()
+      }
+      $0.webSocket.sendPing = { @Sendable _ in try await Task.never() }
+    }
+
+    // Connect to the socket
+    await store.send(.connectButtonTapped) {
+      $0.connectivityState = .connecting
+    }
+    actions.continuation.yield(.didOpen(protocol: nil))
+    await store.receive(\.webSocket.didOpen) {
+      $0.connectivityState = .connected
+    }
+
+    // Send a message
+    await store.send(.messageToSendChanged("Hi")) {
+      $0.messageToSend = "Hi"
+    }
+    await store.send(.sendButtonTapped) {
+      $0.messageToSend = ""
+    }
+    await store.receive(\.sendResponse) {
+      $0.alert = AlertState {
+        TextState("Could not send socket message. Connect to the server first, and try again.")
+      }
+    }
+
+    // Disconnect from the socket
+    await store.send(.connectButtonTapped) {
+      $0.connectivityState = .disconnected
+    }
+    await store.finish()
+  }
+
+  @Test
+  func pings() async {
+    let actions = AsyncStream.makeStream(of: WebSocketClient.Action.self)
+    let clock = TestClock()
+    var pingsCount = 0
+
+    let store = TestStore(initialState: WebSocket.State()) {
+      WebSocket()
+    } withDependencies: {
+      $0.continuousClock = clock
+      $0.webSocket.open = { @Sendable _, _, _ in actions.stream }
+      $0.webSocket.receive = { @Sendable _ in try await Task.never() }
+      $0.webSocket.sendPing = { @MainActor @Sendable _ in pingsCount += 1 }
+    }
+
+    // Connect to the socket
+    await store.send(.connectButtonTapped) {
+      $0.connectivityState = .connecting
+    }
+    actions.continuation.yield(.didOpen(protocol: nil))
+    await store.receive(\.webSocket.didOpen) {
+      $0.connectivityState = .connected
+    }
+
+    // Wait for ping
+    #expect(pingsCount == 0)
+    await clock.advance(by: .seconds(10))
+    #expect(pingsCount == 1)
+
+    // Disconnect from the socket
+    await store.send(.connectButtonTapped) {
+      $0.connectivityState = .disconnected
+    }
+  }
+
+  @Test
+  func connectError() async {
+    let actions = AsyncStream.makeStream(of: WebSocketClient.Action.self)
+
+    let store = TestStore(initialState: WebSocket.State()) {
+      WebSocket()
+    } withDependencies: {
+      $0.continuousClock = ImmediateClock()
+      $0.webSocket.open = { @Sendable _, _, _ in actions.stream }
+      $0.webSocket.receive = { @Sendable _ in try await Task.never() }
+      $0.webSocket.sendPing = { @Sendable _ in try await Task.never() }
+    }
+
+    // Attempt to connect to the socket
+    await store.send(.connectButtonTapped) {
+      $0.connectivityState = .connecting
+    }
+    actions.continuation.yield(.didClose(code: .internalServerError, reason: nil))
+    await store.receive(\.webSocket.didClose) {
+      $0.connectivityState = .disconnected
+    }
+  }
+}
+
+import ComposableArchitecture
+import Foundation
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct RecursionTests {
+  @Test
+  func addRow() async {
+    let store = TestStore(initialState: Nested.State(id: UUID())) {
+      Nested()
+    } withDependencies: {
+      $0.uuid = .incrementing
+    }
+
+    await store.send(.addRowButtonTapped) {
+      $0.rows.append(Nested.State(id: UUID(0)))
+    }
+
+    await store.send(\.rows[id: UUID(0)].addRowButtonTapped) {
+      $0.rows[id: UUID(0)]?.rows.append(Nested.State(id: UUID(1)))
+    }
+  }
+
+  @Test
+  func changeName() async {
+    let store = TestStore(initialState: Nested.State(id: UUID())) {
+      Nested()
+    }
+
+    await store.send(.nameTextFieldChanged("Blob")) {
+      $0.name = "Blob"
+    }
+  }
+
+  @Test
+  func deleteRow() async {
+    let store = TestStore(
+      initialState: Nested.State(
+        id: UUID(),
+        rows: [
+          Nested.State(id: UUID(0)),
+          Nested.State(id: UUID(1)),
+          Nested.State(id: UUID(2)),
+        ]
+      )
+    ) {
+      Nested()
+    }
+
+    await store.send(.onDelete(IndexSet(integer: 1))) {
+      $0.rows.remove(id: UUID(1))
+    }
+  }
+}
+
+import ComposableArchitecture
+import Foundation
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct ReusableComponentsFavoritingTests {
+  @Test
+  func happyPath() async {
+    let clock = TestClock()
+
+    let episodes: IdentifiedArrayOf<Episode.State> = [
+      Episode.State(
+        id: UUID(0),
+        isFavorite: false,
+        title: "Functions"
+      ),
+      Episode.State(
+        id: UUID(1),
+        isFavorite: false,
+        title: "Functions"
+      ),
+      Episode.State(
+        id: UUID(2),
+        isFavorite: false,
+        title: "Functions"
+      ),
+    ]
+    let store = TestStore(initialState: Episodes.State(episodes: episodes)) {
+      Episodes(
+        favorite: { _, isFavorite in
+          try await clock.sleep(for: .seconds(1))
+          return isFavorite
+        }
+      )
+    }
+
+    await store.send(\.episodes[id: UUID(0)].favorite.buttonTapped) {
+      $0.episodes[id: UUID(0)]?.isFavorite = true
+    }
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.episodes[id: episodes[0].id].favorite.response.success)
+
+    await store.send(\.episodes[id: episodes[1].id].favorite.buttonTapped) {
+      $0.episodes[id: UUID(1)]?.isFavorite = true
+    }
+    await store.send(\.episodes[id: episodes[1].id].favorite.buttonTapped) {
+      $0.episodes[id: UUID(1)]?.isFavorite = false
+    }
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.episodes[id: episodes[1].id].favorite.response.success)
+  }
+
+  @Test
+  func unhappyPath() async {
+    let episodes: IdentifiedArrayOf<Episode.State> = [
+      Episode.State(
+        id: UUID(0),
+        isFavorite: false,
+        title: "Functions"
+      )
+    ]
+    let store = TestStore(initialState: Episodes.State(episodes: episodes)) {
+      Episodes(favorite: { _, _ in throw FavoriteError() })
+    }
+
+    await store.send(\.episodes[id: UUID(0)].favorite.buttonTapped) {
+      $0.episodes[id: UUID(0)]?.isFavorite = true
+    }
+
+    await store.receive(\.episodes[id: episodes[0].id].favorite.response.failure) {
+      $0.episodes[id: UUID(0)]?.alert = AlertState {
+        TextState("Favoriting failed.")
+      }
+    }
+
+    await store.send(\.episodes[id: UUID(0)].favorite.alert.dismiss) {
+      $0.episodes[id: UUID(0)]?.alert = nil
+      $0.episodes[id: UUID(0)]?.isFavorite = false
+    }
+  }
+}
+
+import ComposableArchitecture
+import Foundation
+import Testing
+
+@testable import SwiftUICaseStudies
+
+@MainActor
+struct ReusableComponentsDownloadComponentTests {
+  @Test
+  func downloadFlow() async {
+    let download = AsyncThrowingStream.makeStream(of: DownloadClient.Event.self)
+    let store = TestStore(
+      initialState: DownloadComponent.State(
+        id: AnyHashableSendable(1),
+        mode: .notDownloaded,
+        url: URL(string: "https://www.pointfree.co")!
+      )
+    ) {
+      DownloadComponent()
+    } withDependencies: {
+      $0.downloadClient.download = { @Sendable _ in download.stream }
+    }
+
+    await store.send(.buttonTapped) {
+      $0.mode = .startingToDownload
+    }
+
+    download.continuation.yield(.updateProgress(0.2))
+    await store.receive(\.downloadClient.success.updateProgress) {
+      $0.mode = .downloading(progress: 0.2)
+    }
+
+    download.continuation.yield(.response(Data()))
+    download.continuation.finish()
+    await store.receive(\.downloadClient.success.response) {
+      $0.mode = .downloaded
+    }
+  }
+
+  @Test
+  func cancelDownloadFlow() async {
+    let download = AsyncThrowingStream.makeStream(of: DownloadClient.Event.self)
+    let store = TestStore(
+      initialState: DownloadComponent.State(
+        id: AnyHashableSendable(1),
+        mode: .notDownloaded,
+        url: URL(string: "https://www.pointfree.co")!
+      )
+    ) {
+      DownloadComponent()
+    } withDependencies: {
+      $0.downloadClient.download = { @Sendable _ in download.stream }
+    }
+
+    await store.send(.buttonTapped) {
+      $0.mode = .startingToDownload
+    }
+
+    download.continuation.yield(.updateProgress(0.2))
+    await store.receive(\.downloadClient.success.updateProgress) {
+      $0.mode = .downloading(progress: 0.2)
+    }
+
+    await store.send(.buttonTapped) {
+      $0.alert = AlertState {
+        TextState("Do you want to stop downloading this map?")
+      } actions: {
+        ButtonState(role: .destructive, action: .send(.stopButtonTapped, animation: .default)) {
+          TextState("Stop")
+        }
+        ButtonState(role: .cancel) {
+          TextState("Nevermind")
+        }
+      }
+    }
+
+    await store.send(\.alert.stopButtonTapped) {
+      $0.alert = nil
+      $0.mode = .notDownloaded
+    }
+  }
+
+  @Test
+  func downloadFinishesWhileTryingToCancel() async {
+    let download = AsyncThrowingStream.makeStream(of: DownloadClient.Event.self)
+    let store = TestStore(
+      initialState: DownloadComponent.State(
+        id: AnyHashableSendable(1),
+        mode: .notDownloaded,
+        url: URL(string: "https://www.pointfree.co")!
+      )
+    ) {
+      DownloadComponent()
+    } withDependencies: {
+      $0.downloadClient.download = { @Sendable _ in download.stream }
+    }
+
+    let task = await store.send(.buttonTapped) {
+      $0.mode = .startingToDownload
+    }
+
+    await store.send(.buttonTapped) {
+      $0.alert = AlertState {
+        TextState("Do you want to stop downloading this map?")
+      } actions: {
+        ButtonState(role: .destructive, action: .send(.stopButtonTapped, animation: .default)) {
+          TextState("Stop")
+        }
+        ButtonState(role: .cancel) {
+          TextState("Nevermind")
+        }
+      }
+    }
+
+    download.continuation.yield(.response(Data()))
+    download.continuation.finish()
+    await store.receive(\.downloadClient.success.response) {
+      $0.alert = nil
+      $0.mode = .downloaded
+    }
+
+    await task.finish()
+  }
+
+  @Test
+  func deleteDownloadFlow() async {
+    let download = AsyncThrowingStream.makeStream(of: DownloadClient.Event.self)
+    let store = TestStore(
+      initialState: DownloadComponent.State(
+        id: AnyHashableSendable(1),
+        mode: .downloaded,
+        url: URL(string: "https://www.pointfree.co")!
+      )
+    ) {
+      DownloadComponent()
+    } withDependencies: {
+      $0.downloadClient.download = { @Sendable _ in download.stream }
+    }
+
+    await store.send(.buttonTapped) {
+      $0.alert = AlertState {
+        TextState("Do you want to delete this map from your offline storage?")
+      } actions: {
+        ButtonState(role: .destructive, action: .send(.deleteButtonTapped, animation: .default)) {
+          TextState("Delete")
+        }
+        ButtonState(role: .cancel) {
+          TextState("Nevermind")
+        }
+      }
+    }
+
+    await store.send(\.alert.deleteButtonTapped) {
+      $0.alert = nil
+      $0.mode = .notDownloaded
+    }
+  }
+}

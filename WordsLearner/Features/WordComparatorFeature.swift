@@ -63,7 +63,6 @@ struct WordComparatorFeature {
         case backgroundTasksButtonTapped
         case path(StackActionOf<Path>)
         case settings(PresentationAction<SettingsFeature.Action>)
-        case apiKeyStatusChanged(Bool)
         case recentComparisons(RecentComparisonsFeature.Action)
         case alert(PresentationAction<Alert>)
         case clearInputFields
@@ -143,10 +142,6 @@ struct WordComparatorFeature {
                 
             case .historyListButtonTapped:
                 state.path.append(.historyList(ComparisonHistoryListFeature.State()))
-                return .none
-                
-            case let .apiKeyStatusChanged(hasKey):
-                state.hasValidAPIKey = hasKey
                 return .none
                 
             case .settings(.presented(.delegate(.apiKeyChanged))):
