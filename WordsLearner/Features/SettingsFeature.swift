@@ -19,7 +19,7 @@ struct SettingsFeature {
         @Presents var alert: AlertState<Action.Alert>?
     }
     
-    enum Action: BindableAction {
+    enum Action: BindableAction, Equatable {
         case binding(BindingAction<State>)
         case onAppear
         case saveButtonTapped
