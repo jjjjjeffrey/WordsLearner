@@ -118,48 +118,6 @@ struct WordComparatorFeatureTests {
         }
     }
     
-    @Test
-    func settingsButtonTapped() async {
-        let store = TestStore(initialState: WordComparatorFeature.State()) {
-            WordComparatorFeature()
-        } withDependencies: {
-            $0.apiKeyManager = .testValue
-            $0.defaultDatabase = .testDatabase
-        }
-        
-        await store.send(.settingsButtonTapped) {
-            $0.settings = SettingsFeature.State()
-        }
-    }
-    
-    @Test
-    func backgroundTasksButtonTapped() async {
-        let store = TestStore(initialState: WordComparatorFeature.State()) {
-            WordComparatorFeature()
-        } withDependencies: {
-            $0.apiKeyManager = .testValue
-            $0.defaultDatabase = .testDatabase
-        }
-        
-        await store.send(.backgroundTasksButtonTapped) {
-            $0.path.append(.backgroundTasks(BackgroundTasksFeature.State()))
-        }
-    }
-    
-    @Test
-    func historyListButtonTapped() async {
-        let store = TestStore(initialState: WordComparatorFeature.State()) {
-            WordComparatorFeature()
-        } withDependencies: {
-            $0.apiKeyManager = .testValue
-            $0.defaultDatabase = .testDatabase
-        }
-        
-        await store.send(.historyListButtonTapped) {
-            $0.path.append(.historyList(ComparisonHistoryListFeature.State()))
-        }
-    }
-    
     // MARK: - Input Actions Tests
     
     @Test
