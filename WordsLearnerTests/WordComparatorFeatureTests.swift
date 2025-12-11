@@ -113,9 +113,9 @@ struct WordComparatorFeatureTests {
             $0.apiKeyManager = .testValue
         }
         
-        await store.send(.onAppear)
-        
-        #expect(store.state.hasValidAPIKey == true)
+        await store.send(.onAppear) {
+            $0.hasValidAPIKey = true
+        }
     }
     
     @Test
@@ -340,6 +340,10 @@ struct WordComparatorFeatureTests {
             $0.backgroundTaskManager.addTask = { _, _, _ in }
             $0.apiKeyManager = .testValue
             $0.defaultDatabase = .testDatabase
+        }
+        
+        await store.send(.settingsButtonTapped) {
+            $0.settings = SettingsFeature.State()
         }
         
         await store.send(.settings(.presented(.delegate(.apiKeyChanged)))) {
