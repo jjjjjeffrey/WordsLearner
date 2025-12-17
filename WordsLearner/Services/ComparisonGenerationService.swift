@@ -93,13 +93,14 @@ struct ComparisonGenerationService {
 
 struct ComparisonGenerationServiceClient {
     var generateComparison: @Sendable (String, String, String) -> AsyncThrowingStream<String, Error>
-    var saveToHistory: @Sendable (String, String, String, String, Date) async throws -> Void
+    var saveToHistory: @Sendable (String, String, String, String) async throws -> Void
 }
 
 extension ComparisonGenerationServiceClient: DependencyKey {
     static let liveValue: Self = {
         @Dependency(\.aiService) var aiService
         @Dependency(\.defaultDatabase) var database
+        @Dependency(\.date.now) var now
         
         let service = ComparisonGenerationService(
             aiService: aiService,
@@ -114,13 +115,13 @@ extension ComparisonGenerationServiceClient: DependencyKey {
                     sentence: sentence
                 )
             },
-            saveToHistory: { word1, word2, sentence, response, date in
+            saveToHistory: { word1, word2, sentence, response in
                 try await service.saveToHistory(
                     word1: word1,
                     word2: word2,
                     sentence: sentence,
                     response: response,
-                    date: date
+                    date: now
                 )
             }
         )
@@ -194,7 +195,7 @@ extension ComparisonGenerationServiceClient: DependencyKey {
                 }
             }
         },
-        saveToHistory: { _, _, _, _, _ in }
+        saveToHistory: { _, _, _, _ in }
     )
 }
 

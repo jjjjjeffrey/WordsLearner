@@ -19,6 +19,7 @@ struct ResponseDetailFeatureTests {
     
     @Test
     func testOnAppearWithShouldStartStreamingTrue() async {
+        let (stream, continuation) = AsyncThrowingStream.makeStream(of: String.self)
         let store = TestStore(initialState: ResponseDetailFeature.State(
             word1: "word1",
             word2: "word2",
@@ -26,6 +27,13 @@ struct ResponseDetailFeatureTests {
             shouldStartStreaming: true
         )) {
             ResponseDetailFeature()
+        } withDependencies: {
+            $0.comparisonGenerator = .init(
+                generateComparison: { _, _, _ in stream },
+                saveToHistory: { @Sendable _, _, _, _ async throws in
+                    await Task.yield()
+                }
+            )
         }
         
         await store.send(.onAppear)
@@ -34,6 +42,23 @@ struct ResponseDetailFeatureTests {
             $0.isStreaming = true
             $0.errorMessage = nil
         }
+        
+        // Send first chunk
+        continuation.yield("First chunk ")
+        await store.receive(.streamChunkReceived("First chunk ")) {
+            $0.streamingResponse = "First chunk "
+        }
+        
+        // Complete the stream
+        continuation.finish()
+        await store.receive(.streamCompleted) {
+            $0.isStreaming = false
+        }
+        
+        // Verify saveToHistory was called and comparisonSaved is received
+        await store.receive(.comparisonSaved)
+        
+        await store.finish()
     }
     
     @Test
@@ -56,7 +81,6 @@ struct ResponseDetailFeatureTests {
     @Test
     func testStartStreamingSuccess() async {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: String.self)
-        let fixedDate = Date(timeIntervalSince1970: 1000)
         
         let store = TestStore(initialState: ResponseDetailFeature.State(
             word1: "word1",
@@ -65,9 +89,12 @@ struct ResponseDetailFeatureTests {
         )) {
             ResponseDetailFeature()
         } withDependencies: {
-            $0.comparisonGenerator.generateComparison = { _, _, _ in stream }
-            $0.date.now = { fixedDate }()
-            $0.comparisonGenerator.saveToHistory = { _, _, _, _, _ in }
+            $0.comparisonGenerator = .init(
+                generateComparison: { _, _, _ in stream },
+                saveToHistory: { @Sendable _, _, _, _ async throws in
+                    await Task.yield()
+                }
+            )
         }
         
         await store.send(.startStreaming) {
@@ -136,7 +163,11 @@ struct ResponseDetailFeatureTests {
             var localizedDescription: String { message }
         }
         
-        let error = StreamError(message: "Stream failed")
+        let error = NSError(
+            domain: "test",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Stream failed"]
+        )
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: String.self)
         
         let store = TestStore(initialState: ResponseDetailFeature.State(
@@ -146,7 +177,12 @@ struct ResponseDetailFeatureTests {
         )) {
             ResponseDetailFeature()
         } withDependencies: {
-            $0.comparisonGenerator.generateComparison = { _, _, _ in stream }
+            $0.comparisonGenerator = .init(
+                generateComparison: { _, _, _ in stream },
+                saveToHistory: { @Sendable _, _, _, _ async throws in
+                    await Task.yield()
+                }
+            )
         }
         
         await store.send(.startStreaming) {
@@ -168,10 +204,8 @@ struct ResponseDetailFeatureTests {
             let message: String
             var localizedDescription: String { message }
         }
-        
-        let error = SaveError(message: "Database error")
+
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: String.self)
-        let fixedDate = Date(timeIntervalSince1970: 1000)
         
         let store = TestStore(initialState: ResponseDetailFeature.State(
             word1: "word1",
@@ -180,9 +214,16 @@ struct ResponseDetailFeatureTests {
         )) {
             ResponseDetailFeature()
         } withDependencies: {
-            $0.comparisonGenerator.generateComparison = { _, _, _ in stream }
-            $0.date = .constant(Date(timeIntervalSince1970: 1234567890))
-            $0.comparisonGenerator.saveToHistory = { _, _, _, _, _ in throw error }
+            $0.comparisonGenerator = .init(
+                generateComparison: { _, _, _ in stream },
+                saveToHistory: { @Sendable _, _, _, _ async throws in
+                    throw NSError(
+                        domain: "test",
+                        code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: "Database error"]
+                    )
+                }
+            )
         }
         
         await store.send(.startStreaming) {
@@ -213,13 +254,11 @@ struct ResponseDetailFeatureTests {
     @Test
     func testComparisonSaved() async {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: String.self)
-        let fixedDate = Date(timeIntervalSince1970: 1000)
         var saveCalled = false
         var savedWord1: String?
         var savedWord2: String?
         var savedSentence: String?
         var savedResponse: String?
-        var savedDate: Date?
         
         let store = TestStore(initialState: ResponseDetailFeature.State(
             word1: "word1",
@@ -228,16 +267,17 @@ struct ResponseDetailFeatureTests {
         )) {
             ResponseDetailFeature()
         } withDependencies: {
-            $0.comparisonGenerator.generateComparison = { _, _, _ in stream }
-            $0.date.now = { fixedDate }()
-            $0.comparisonGenerator.saveToHistory = { word1, word2, sentence, response, date in
-                saveCalled = true
-                savedWord1 = word1
-                savedWord2 = word2
-                savedSentence = sentence
-                savedResponse = response
-                savedDate = date
-            }
+            $0.comparisonGenerator = .init(
+                generateComparison: { _, _, _ in stream },
+                saveToHistory: { @Sendable word1, word2, sentence, response async throws in
+                    saveCalled = true
+                    savedWord1 = word1
+                    savedWord2 = word2
+                    savedSentence = sentence
+                    savedResponse = response
+                    await Task.yield()
+                }
+            )
         }
         
         await store.send(.startStreaming) {
@@ -270,7 +310,6 @@ struct ResponseDetailFeatureTests {
         #expect(savedWord2 == "word2")
         #expect(savedSentence == "This is a sentence")
         #expect(savedResponse == "Response text")
-        #expect(savedDate == fixedDate)
     }
     
     // MARK: - Share Functionality Test

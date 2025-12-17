@@ -31,11 +31,13 @@ struct EnglishWordComparatorApp: App {
     
     var body: some Scene {
         WindowGroup {
-            WordComparatorMainView(
-                store: Store(initialState: WordComparatorFeature.State()) {
-                    WordComparatorFeature()
-                }
-            )
+            if !isTesting {
+                WordComparatorMainView(
+                    store: Store(initialState: WordComparatorFeature.State()) {
+                        WordComparatorFeature()
+                    }
+                )
+            }
         }
     }
 }
