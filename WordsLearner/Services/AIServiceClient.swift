@@ -27,7 +27,7 @@ extension AIServiceClient: DependencyKey {
                             throw AIError.authenticationError
                         }
                         
-                        guard let url = URL(string: "https://aihubmix.com/v1/chat/completions") else {
+                        guard let url = URL(string: "https://zenmux.ai/api/v1/chat/completions") else {
                             throw AIError.invalidURL
                         }
                         
@@ -37,9 +37,9 @@ extension AIServiceClient: DependencyKey {
                         request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
                         let model: String
                         #if DEBUG
-                        model = "gpt-4o-mini"
+                        model = "openai/gpt-4o-mini"
                         #else
-                        model = "gemini-3-pro-preview"
+                        model = "google/gemini-3-pro-preview"
                         #endif
                         let payload: [String: Any] = [
                             "model": model,
