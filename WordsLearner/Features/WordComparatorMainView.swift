@@ -309,7 +309,7 @@ struct WordComparatorMainView: View {
 #Preview("Recent Comparisons") {
     withDependencies {
         $0.apiKeyManager = .testValue
-        $0.defaultDatabase = .testDatabase
+        try! $0.bootstrapDatabase()
     } operation: {
         WordComparatorMainView(
             store: Store(initialState: .init()) {

@@ -32,7 +32,8 @@ extension DependencyValues {
 }
 
 /// Creates and configures the app database
-private func createAppDatabase() throws -> any DatabaseWriter {
+
+func createAppDatabase() throws -> any DatabaseWriter {
     @Dependency(\.context) var context
     
     var configuration = Configuration()
@@ -214,155 +215,112 @@ private func createAppDatabase() throws -> any DatabaseWriter {
         )
         .execute(db)
     }
+#if DEBUG
+    // Seed preview data
+    if context == .preview {
+        migrator.registerMigration("Seed some preview data") { db in
+            try db.seedSampleData()
+        }
+    }
+#endif
     
     try migrator.migrate(database)
     
     return database
 }
 
-// MARK: - Test Database
-
-extension DatabaseWriter where Self == DatabaseQueue {
-    /// Test database for previews and tests
-    static var testDatabase: Self {
-        let database = try! DatabaseQueue()
-        var migrator = DatabaseMigrator()
-        
-        migrator.registerMigration("Create test tables") { db in
-            // ComparisonHistory table
-            try #sql(
-                """
-                CREATE TABLE "comparisonHistories" (
-                    "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
-                    "word1" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
-                    "word2" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
-                    "sentence" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
-                    "response" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
-                    "date" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP,
-                    "isRead" INTEGER NOT NULL DEFAULT 0
-                ) STRICT
-                """
+#if DEBUG
+extension Database {
+    func seedSampleData() throws {
+        // Seed some test data
+        try seed {
+            ComparisonHistory.Draft(
+                word1: "character",
+                word2: "characteristic",
+                sentence: "The character of this wine is unique.",
+                response: "Test response...",
+                date: Date(),
+                isRead: false
             )
-            .execute(db)
-            
-            // BackgroundTask table
-            try #sql(
-                """
-                CREATE TABLE "backgroundTasks" (
-                    "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
-                    "word1" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
-                    "word2" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
-                    "sentence" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
-                    "status" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT 'pending',
-                    "response" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
-                    "error" TEXT,
-                    "createdAt" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP,
-                    "updatedAt" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP
-                ) STRICT
-                """
+            ComparisonHistory.Draft(
+                word1: "affect",
+                word2: "effect",
+                sentence: "How does this affect the result?",
+                response: "Another test response...",
+                date: Date().addingTimeInterval(-3600),
+                isRead: false
             )
-            .execute(db)
-            
-            // Seed some test data
-            try ComparisonHistory.insert {
-                [
-                    ComparisonHistory.Draft(
-                        word1: "character",
-                        word2: "characteristic",
-                        sentence: "The character of this wine is unique.",
-                        response: "Test response...",
-                        date: Date(),
-                        isRead: false
-                    ),
-                    ComparisonHistory.Draft(
-                        word1: "affect",
-                        word2: "effect",
-                        sentence: "How does this affect the result?",
-                        response: "Another test response...",
-                        date: Date().addingTimeInterval(-3600),
-                        isRead: false
-                    ),
-                    ComparisonHistory.Draft(
-                        word1: "emigrate",
-                        word2: "immigrate",
-                        sentence: "Many people emigrate to find better opportunities.",
-                        response: "A migrated test response...",
-                        date: Date().addingTimeInterval(-7200),
-                        isRead: true
-                    ),
-                    ComparisonHistory.Draft(
-                        word1: "infer",
-                        word2: "imply",
-                        sentence: "What do you infer from her words?",
-                        response: "Implied answer test...",
-                        date: Date().addingTimeInterval(-10800),
-                        isRead: true
-                    ),
-                    ComparisonHistory.Draft(
-                        word1: "stationary",
-                        word2: "stationery",
-                        sentence: "The bike remained stationary.",
-                        response: "More comparison data...",
-                        date: Date().addingTimeInterval(-14400),
-                        isRead: false
-                    )
-                ]
-            }
-            .execute(db)
+            ComparisonHistory.Draft(
+                word1: "emigrate",
+                word2: "immigrate",
+                sentence: "Many people emigrate to find better opportunities.",
+                response: "A migrated test response...",
+                date: Date().addingTimeInterval(-7200),
+                isRead: true
+            )
+            ComparisonHistory.Draft(
+                word1: "infer",
+                word2: "imply",
+                sentence: "What do you infer from her words?",
+                response: "Implied answer test...",
+                date: Date().addingTimeInterval(-10800),
+                isRead: true
+            )
+            ComparisonHistory.Draft(
+                word1: "stationary",
+                word2: "stationery",
+                sentence: "The bike remained stationary.",
+                response: "More comparison data...",
+                date: Date().addingTimeInterval(-14400),
+                isRead: false
+            )
             
             // Seed test background tasks
-            try BackgroundTask.insert {
-                [
-                    BackgroundTask.Draft(
-                        id: UUID(),
-                        word1: "accept",
-                        word2: "except",
-                        sentence: "I accept all terms.",
-                        status: BackgroundTask.Status.pending.rawValue,
-                        response: "",
-                        error: nil,
-                        createdAt: Date(),
-                        updatedAt: Date()
-                    ),
-                    BackgroundTask.Draft(
-                        id: UUID(),
-                        word1: "advice",
-                        word2: "advise",
-                        sentence: "Can you give me some advice?",
-                        status: BackgroundTask.Status.completed.rawValue,
-                        response: "Test response for advice vs advise...",
-                        error: nil,
-                        createdAt: Date().addingTimeInterval(-3600),
-                        updatedAt: Date().addingTimeInterval(-1800)
-                    ),
-                    BackgroundTask.Draft(
-                        id: UUID(),
-                        word1: "complement",
-                        word2: "compliment",
-                        sentence: "Your shoes complement the outfit.",
-                        status: BackgroundTask.Status.generating.rawValue,
-                        response: "",
-                        error: nil,
-                        createdAt: Date().addingTimeInterval(-7200),
-                        updatedAt: Date().addingTimeInterval(-3600)
-                    ),
-                    BackgroundTask.Draft(
-                        id: UUID(),
-                        word1: "principle",
-                        word2: "principal",
-                        sentence: "Honesty is the best principle.",
-                        status: BackgroundTask.Status.failed.rawValue,
-                        response: "",
-                        error: "Simulated failure during generation.",
-                        createdAt: Date().addingTimeInterval(-10800),
-                        updatedAt: Date().addingTimeInterval(-7200)
-                    )
-                ]
-            }
-            .execute(db)
+            BackgroundTask.Draft(
+                id: UUID(),
+                word1: "accept",
+                word2: "except",
+                sentence: "I accept all terms.",
+                status: BackgroundTask.Status.pending.rawValue,
+                response: "",
+                error: nil,
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+            BackgroundTask.Draft(
+                id: UUID(),
+                word1: "advice",
+                word2: "advise",
+                sentence: "Can you give me some advice?",
+                status: BackgroundTask.Status.completed.rawValue,
+                response: "Test response for advice vs advise...",
+                error: nil,
+                createdAt: Date().addingTimeInterval(-3600),
+                updatedAt: Date().addingTimeInterval(-1800)
+            )
+            BackgroundTask.Draft(
+                id: UUID(),
+                word1: "complement",
+                word2: "compliment",
+                sentence: "Your shoes complement the outfit.",
+                status: BackgroundTask.Status.generating.rawValue,
+                response: "",
+                error: nil,
+                createdAt: Date().addingTimeInterval(-7200),
+                updatedAt: Date().addingTimeInterval(-3600)
+            )
+            BackgroundTask.Draft(
+                id: UUID(),
+                word1: "principle",
+                word2: "principal",
+                sentence: "Honesty is the best principle.",
+                status: BackgroundTask.Status.failed.rawValue,
+                response: "",
+                error: "Simulated failure during generation.",
+                createdAt: Date().addingTimeInterval(-10800),
+                updatedAt: Date().addingTimeInterval(-7200)
+            )
         }
-        
-        try! migrator.migrate(database)
-        return database
     }
 }
+#endif

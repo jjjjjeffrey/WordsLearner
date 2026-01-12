@@ -15,11 +15,9 @@ struct EnglishWordComparatorApp: App {
         // Bootstrap database on app launch
         try! prepareDependencies {
             #if DEBUG
-            $0.defaultDatabase = .testDatabase
             $0.comparisonGenerator = .testValue
-            #else
-            try $0.bootstrapDatabase()
             #endif
+            try $0.bootstrapDatabase()
         }
         
         // Start background task processing

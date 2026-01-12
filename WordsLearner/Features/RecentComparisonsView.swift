@@ -100,7 +100,7 @@ struct RecentComparisonsView: View {
 
 #Preview("Not empty") {
     withDependencies {
-        $0.defaultDatabase = .testDatabase
+        try! $0.bootstrapDatabase()
     } operation: {
         RecentComparisonsView(
             store: Store(initialState: RecentComparisonsFeature.State()) {

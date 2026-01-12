@@ -158,7 +158,7 @@ struct ComparisonHistoryListView: View {
 
 #Preview("Not empty") {
     withDependencies {
-        $0.defaultDatabase = .testDatabase
+        try! $0.bootstrapDatabase()
     } operation: {
         NavigationStack {
             ComparisonHistoryListView(

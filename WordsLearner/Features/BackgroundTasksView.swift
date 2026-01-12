@@ -243,7 +243,7 @@ struct StatusBadge: View {
 // MARK: - Preview
 #Preview("Not empty") {
     withDependencies {
-        $0.defaultDatabase = .testDatabase
+        try! $0.bootstrapDatabase()
     } operation: {
         NavigationStack {
             BackgroundTasksView(

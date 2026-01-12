@@ -22,19 +22,11 @@
 			remoteGlobalIDString = 0051EDC72EC44A8D008DB61F;
 			remoteInfo = WordsLearner;
 		};
-		0051EDE02EC44A90008DB61F /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 0051EDC02EC44A8D008DB61F /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 0051EDC72EC44A8D008DB61F;
-			remoteInfo = WordsLearner;
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		0051EDC82EC44A8D008DB61F /* WordsLearner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WordsLearner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0051EDD52EC44A90008DB61F /* WordsLearnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WordsLearnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		0051EDDF2EC44A90008DB61F /* WordsLearnerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WordsLearnerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -75,13 +67,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		0051EDDC2EC44A90008DB61F /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -101,7 +86,6 @@
 			children = (
 				0051EDC82EC44A8D008DB61F /* WordsLearner.app */,
 				0051EDD52EC44A90008DB61F /* WordsLearnerTests.xctest */,
-				0051EDDF2EC44A90008DB61F /* WordsLearnerUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -166,29 +150,6 @@
 			productReference = 0051EDD52EC44A90008DB61F /* WordsLearnerTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		0051EDDE2EC44A90008DB61F /* WordsLearnerUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 0051EDEF2EC44A90008DB61F /* Build configuration list for PBXNativeTarget "WordsLearnerUITests" */;
-			buildPhases = (
-				0051EDDB2EC44A90008DB61F /* Sources */,
-				0051EDDC2EC44A90008DB61F /* Frameworks */,
-				0051EDDD2EC44A90008DB61F /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				0051EDE12EC44A90008DB61F /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				0051EDE22EC44A90008DB61F /* WordsLearnerUITests */,
-			);
-			name = WordsLearnerUITests;
-			packageProductDependencies = (
-			);
-			productName = WordsLearnerUITests;
-			productReference = 0051EDDF2EC44A90008DB61F /* WordsLearnerUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -203,10 +164,6 @@
 						CreatedOnToolsVersion = 26.0.1;
 					};
 					0051EDD42EC44A90008DB61F = {
-						CreatedOnToolsVersion = 26.0.1;
-						TestTargetID = 0051EDC72EC44A8D008DB61F;
-					};
-					0051EDDE2EC44A90008DB61F = {
 						CreatedOnToolsVersion = 26.0.1;
 						TestTargetID = 0051EDC72EC44A8D008DB61F;
 					};
@@ -234,7 +191,6 @@
 			targets = (
 				0051EDC72EC44A8D008DB61F /* WordsLearner */,
 				0051EDD42EC44A90008DB61F /* WordsLearnerTests */,
-				0051EDDE2EC44A90008DB61F /* WordsLearnerUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -248,13 +204,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		0051EDD32EC44A90008DB61F /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		0051EDDD2EC44A90008DB61F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -278,13 +227,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		0051EDDB2EC44A90008DB61F /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -292,11 +234,6 @@
 			isa = PBXTargetDependency;
 			target = 0051EDC72EC44A8D008DB61F /* WordsLearner */;
 			targetProxy = 0051EDD62EC44A90008DB61F /* PBXContainerItemProxy */;
-		};
-		0051EDE12EC44A90008DB61F /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 0051EDC72EC44A8D008DB61F /* WordsLearner */;
-			targetProxy = 0051EDE02EC44A90008DB61F /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -538,46 +475,6 @@
 			};
 			name = Release;
 		};
-		0051EDF02EC44A90008DB61F /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = NM2U2J6H34;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.wordslearner.jeffrey.WordsLearnerUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = WordsLearner;
-			};
-			name = Debug;
-		};
-		0051EDF12EC44A90008DB61F /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = NM2U2J6H34;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.wordslearner.jeffrey.WordsLearnerUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = WordsLearner;
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -604,15 +501,6 @@
 			buildConfigurations = (
 				0051EDED2EC44A90008DB61F /* Debug */,
 				0051EDEE2EC44A90008DB61F /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		0051EDEF2EC44A90008DB61F /* Build configuration list for PBXNativeTarget "WordsLearnerUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				0051EDF02EC44A90008DB61F /* Debug */,
-				0051EDF12EC44A90008DB61F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
