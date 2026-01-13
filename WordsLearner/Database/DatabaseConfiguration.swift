@@ -217,7 +217,7 @@ func createAppDatabase() throws -> any DatabaseWriter {
     }
 #if DEBUG
     // Seed preview data
-    if context == .preview {
+    if context != .live {
         migrator.registerMigration("Seed some preview data") { db in
             try db.seedSampleData()
         }
@@ -239,7 +239,7 @@ extension Database {
                 word2: "characteristic",
                 sentence: "The character of this wine is unique.",
                 response: "Test response...",
-                date: Date(),
+                date: Date().addingTimeInterval(-3600),
                 isRead: false
             )
             ComparisonHistory.Draft(
@@ -247,7 +247,7 @@ extension Database {
                 word2: "effect",
                 sentence: "How does this affect the result?",
                 response: "Another test response...",
-                date: Date().addingTimeInterval(-3600),
+                date: Date(),
                 isRead: false
             )
             ComparisonHistory.Draft(
@@ -273,6 +273,86 @@ extension Database {
                 response: "More comparison data...",
                 date: Date().addingTimeInterval(-14400),
                 isRead: false
+            )
+            ComparisonHistory.Draft(
+                word1: "compliment",
+                word2: "complement",
+                sentence: "She gave me a sincere compliment on my presentation.",
+                response: "Used 'compliment' for praise; 'complement' means completes/ pairs well.",
+                date: Date().addingTimeInterval(-1800),
+                isRead: false
+            )
+            ComparisonHistory.Draft(
+                word1: "principal",
+                word2: "principle",
+                sentence: "The principal announced a new school policy today.",
+                response: "'Principal' is a person or main thing; 'principle' is a rule or belief.",
+                date: Date().addingTimeInterval(-5400),
+                isRead: true
+            )
+            ComparisonHistory.Draft(
+                word1: "its",
+                word2: "it's",
+                sentence: "The company updated its privacy policy last week.",
+                response: "'Its' is possessive; 'it's' means 'it is' or 'it has'.",
+                date: Date().addingTimeInterval(-9000),
+                isRead: false
+            )
+            ComparisonHistory.Draft(
+                word1: "then",
+                word2: "than",
+                sentence: "Finish your tasks, then we can go for coffee.",
+                response: "'Then' relates to time/sequence; 'than' is used for comparisons.",
+                date: Date().addingTimeInterval(-12600),
+                isRead: true
+            )
+            ComparisonHistory.Draft(
+                word1: "fewer",
+                word2: "less",
+                sentence: "This checkout line has fewer people than the other one.",
+                response: "Use 'fewer' for countable items; 'less' for uncountable amounts.",
+                date: Date().addingTimeInterval(-16200),
+                isRead: false
+            )
+            ComparisonHistory.Draft(
+                word1: "discreet",
+                word2: "discrete",
+                sentence: "Please be discreet about the surprise party plans.",
+                response: "'Discreet' = careful/private; 'discrete' = separate/distinct.",
+                date: Date().addingTimeInterval(-19800),
+                isRead: true
+            )
+            ComparisonHistory.Draft(
+                word1: "ensure",
+                word2: "insure",
+                sentence: "Double-check the settings to ensure the backup completes successfully.",
+                response: "'Ensure' = make certain; 'insure' = provide insurance; 'assure' = reassure someone.",
+                date: Date().addingTimeInterval(-23400),
+                isRead: false
+            )
+            ComparisonHistory.Draft(
+                word1: "lay",
+                word2: "lie",
+                sentence: "I need to lie down for a few minutes.",
+                response: "'Lie' = recline (no object); 'lay' = place something (needs an object).",
+                date: Date().addingTimeInterval(-27000),
+                isRead: true
+            )
+            ComparisonHistory.Draft(
+                word1: "allude",
+                word2: "elude",
+                sentence: "He alluded to a bigger announcement coming next month.",
+                response: "'Allude' = refer indirectly; 'elude' = evade/escape or be difficult to remember.",
+                date: Date().addingTimeInterval(-30600),
+                isRead: false
+            )
+            ComparisonHistory.Draft(
+                word1: "council",
+                word2: "counsel",
+                sentence: "The city council voted on the new zoning proposal.",
+                response: "'Council' = a governing group; 'counsel' = advice or a lawyer.",
+                date: Date().addingTimeInterval(-34200),
+                isRead: true
             )
             
             // Seed test background tasks

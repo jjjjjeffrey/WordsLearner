@@ -27,7 +27,7 @@ struct RecentComparisonsFeature {
         var isLoading: Bool = false
     }
     
-    enum Action: BindableAction {
+    enum Action: BindableAction, Equatable {
         case binding(BindingAction<State>)
         case onAppear
         case comparisonTapped(ComparisonHistory)

@@ -25,7 +25,7 @@ struct WordComparatorFeatureTests {
         }
         
         #expect(store.state.canGenerate == false)
-        #expect(store.state.pendingTasksCount == 0)
+        #expect(store.state.pendingTasksCount == 1)
         
         await store.send(\.binding.word1, "word1") {
             $0.word1 = "word1"
