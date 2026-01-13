@@ -16,8 +16,10 @@ struct EnglishWordComparatorApp: App {
         try! prepareDependencies {
             #if DEBUG
             $0.comparisonGenerator = .testValue
-            #endif
+            try $0.bootstrapDatabase(useTest: true)
+            #else
             try $0.bootstrapDatabase()
+            #endif
         }
         
         // Start background task processing

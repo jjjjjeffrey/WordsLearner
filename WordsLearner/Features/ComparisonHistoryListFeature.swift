@@ -32,7 +32,7 @@ struct ComparisonHistoryListFeature {
         @Presents var alert: AlertState<Action.Alert>?
     }
     
-    enum Action {
+    enum Action: Equatable {
         case comparisonTapped(ComparisonHistory)
         case deleteComparisons(IndexSet)
         case clearAllButtonTapped
@@ -167,24 +167,25 @@ struct ComparisonsFetchKeyRequest: FetchKeyRequest, Equatable {
     }
     
     func fetch(_ db: Database) throws -> Value {
+        // Always fetch all comparisons unfiltered for allComparisons
+        let allComparisons = try ComparisonHistory.order { $0.date.desc() }.fetchAll(db)
+        
+        // Compose WHERE clause for filtered (search + unread)
         var query = ComparisonHistory.order { $0.date.desc() }
-        
-        // Filter by search text
-        if !searchText.isEmpty {
+        if !searchText.isEmpty && showUnreadOnly {
             query = query.where {
-                $0.word1.contains(searchText) ||
-                $0.word2.contains(searchText)
+                (!$0.isRead) &&
+                ($0.word1.contains(searchText) || $0.word2.contains(searchText))
             }
-        }
-        
-        // Filter by read status
-        if showUnreadOnly {
+        } else if !searchText.isEmpty {
+            query = query.where {
+                $0.word1.contains(searchText) || $0.word2.contains(searchText)
+            }
+        } else if showUnreadOnly {
             query = query.where { !$0.isRead }
         }
+        let comparisons = try query.fetchAll(db)
         
-        return try Value(
-            comparisons: query.fetchAll(db),
-            allComparisons: ComparisonHistory.order { $0.date.desc() }.fetchAll(db)
-        )
+        return Value(comparisons: comparisons, allComparisons: allComparisons)
     }
 }
