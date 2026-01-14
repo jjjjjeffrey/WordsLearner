@@ -42,7 +42,7 @@ struct BackgroundTasksFeature {
         }
     }
     
-    enum Action {
+    enum Action: Equatable {
         case onAppear
         case syncCurrentTaskId
         case currentTaskIdUpdated(UUID?)
