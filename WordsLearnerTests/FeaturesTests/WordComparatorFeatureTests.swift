@@ -21,7 +21,7 @@ struct WordComparatorFeatureTests {
             WordComparatorFeature()
         } withDependencies: {
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         #expect(store.state.canGenerate == false)
@@ -52,7 +52,7 @@ struct WordComparatorFeatureTests {
             WordComparatorFeature()
         } withDependencies: {
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(\.binding.word1, "   ") {
@@ -82,7 +82,7 @@ struct WordComparatorFeatureTests {
             WordComparatorFeature()
         } withDependencies: {
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.onAppear) {
@@ -96,7 +96,7 @@ struct WordComparatorFeatureTests {
             WordComparatorFeature()
         } withDependencies: {
             $0.apiKeyManager = .testNoValidAPIKeyValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.onAppear)
@@ -110,7 +110,7 @@ struct WordComparatorFeatureTests {
             WordComparatorFeature()
         } withDependencies: {
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.onAppear) {
@@ -130,7 +130,7 @@ struct WordComparatorFeatureTests {
             WordComparatorFeature()
         } withDependencies: {
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.clearInputFields) {
@@ -153,7 +153,7 @@ struct WordComparatorFeatureTests {
             WordComparatorFeature()
         } withDependencies: {
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.generateButtonTapped) {
@@ -184,7 +184,7 @@ struct WordComparatorFeatureTests {
             WordComparatorFeature()
         } withDependencies: {
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.generateButtonTapped)
@@ -201,7 +201,7 @@ struct WordComparatorFeatureTests {
             WordComparatorFeature()
         } withDependencies: {
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.generateButtonTapped)
@@ -219,7 +219,7 @@ struct WordComparatorFeatureTests {
         } withDependencies: {
             $0.backgroundTaskManager.addTask = { _, _, _ in }
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.generateInBackgroundButtonTapped)
@@ -243,7 +243,7 @@ struct WordComparatorFeatureTests {
         } withDependencies: {
             $0.backgroundTaskManager.addTask = { _, _, _ in }
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.generateInBackgroundButtonTapped)
@@ -261,7 +261,7 @@ struct WordComparatorFeatureTests {
         } withDependencies: {
             $0.backgroundTaskManager.addTask = { _, _, _ in }
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.generateInBackgroundButtonTapped)
@@ -281,7 +281,7 @@ struct WordComparatorFeatureTests {
         } withDependencies: {
             $0.backgroundTaskManager.addTask = { _, _, _ in throw TaskError() }
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.generateInBackgroundButtonTapped)
@@ -297,7 +297,7 @@ struct WordComparatorFeatureTests {
         } withDependencies: {
             $0.backgroundTaskManager.addTask = { _, _, _ in }
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.settingsButtonTapped) {
@@ -326,7 +326,7 @@ struct WordComparatorFeatureTests {
         } withDependencies: {
             $0.backgroundTaskManager.addTask = { _, _, _ in }
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.recentComparisons(.delegate(.comparisonSelected(comparison)))) {
@@ -358,7 +358,7 @@ struct WordComparatorFeatureTests {
             WordComparatorFeature()
         } withDependencies: {
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.historyListButtonTapped) {
@@ -398,7 +398,7 @@ struct WordComparatorFeatureTests {
         } withDependencies: {
             $0.backgroundTaskManager.addTask = { _, _, _ in }
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         await store.send(.backgroundTasksButtonTapped) {
             $0.path.append(.backgroundTasks(BackgroundTasksFeature.State()))
@@ -428,7 +428,7 @@ struct WordComparatorFeatureTests {
         } withDependencies: {
             $0.backgroundTaskManager.addTask = { _, _, _ in }
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(\.binding.word1, "test word1") {
@@ -443,7 +443,7 @@ struct WordComparatorFeatureTests {
         } withDependencies: {
             $0.backgroundTaskManager.addTask = { _, _, _ in }
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(\.binding.word2, "test word2") {
@@ -458,7 +458,7 @@ struct WordComparatorFeatureTests {
         } withDependencies: {
             $0.backgroundTaskManager.addTask = { _, _, _ in }
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(\.binding.sentence, "This is a test sentence") {
@@ -473,7 +473,7 @@ struct WordComparatorFeatureTests {
         } withDependencies: {
             $0.backgroundTaskManager.addTask = { _, _, _ in }
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(\.binding.word1, "word1") {
@@ -498,7 +498,7 @@ struct WordComparatorFeatureTests {
         } withDependencies: {
             $0.backgroundTaskManager.addTask = { _, _, _ in }
             $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.taskAddedSuccessfully)

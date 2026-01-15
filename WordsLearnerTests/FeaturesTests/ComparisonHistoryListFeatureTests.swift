@@ -22,7 +22,7 @@ struct ComparisonHistoryListFeatureTests {
         TestStore(initialState: ComparisonHistoryListFeature.State()) {
             ComparisonHistoryListFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
     }
     

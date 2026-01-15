@@ -24,7 +24,7 @@ struct BackgroundTasksFeatureTests {
     TestStore(initialState: BackgroundTasksFeature.State()) {
       BackgroundTasksFeature()
     } withDependencies: {
-      try! $0.bootstrapDatabase()
+      try! $0.bootstrapDatabase(useTest: true)
       if let backgroundTaskManager {
         $0.backgroundTaskManager = backgroundTaskManager
       }

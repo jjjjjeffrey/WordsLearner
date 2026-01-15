@@ -217,7 +217,7 @@ func createAppDatabase(useTest: Bool) throws -> any DatabaseWriter {
     }
 #if DEBUG
     // Seed preview data
-    if context != .live || useTest {
+    if context != .live && useTest {
         migrator.registerMigration("Seed some preview data") { db in
             try db.seedSampleData()
         }

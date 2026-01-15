@@ -22,7 +22,7 @@ struct RecentComparisonsFeatureTests {
         let store = TestStore(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.onAppear)
@@ -38,7 +38,7 @@ struct RecentComparisonsFeatureTests {
         let store = TestStore(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         #expect(store.state.recentComparisons.count == 10)
@@ -47,11 +47,10 @@ struct RecentComparisonsFeatureTests {
         let tapped = store.state.recentComparisons[0]
         #expect(tapped.isRead == false)
         await store.send(.comparisonTapped(tapped))
-        await store.finish()
+        await store.finish(timeout: 200)
+        await store.receive(.delegate(.comparisonSelected(tapped)))
         #expect(store.state.recentComparisons[0].isRead == true)
         #expect(store.state.recentComparisons[1].isRead == false)
-        
-        await store.receive(.delegate(.comparisonSelected(tapped)))
     }
     
     // MARK: - deleteComparisons Action Tests
@@ -62,7 +61,7 @@ struct RecentComparisonsFeatureTests {
         let store = TestStore(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         #expect(store.state.recentComparisons.count == 10)
@@ -81,7 +80,7 @@ struct RecentComparisonsFeatureTests {
         let store = TestStore(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         #expect(store.state.recentComparisons.count == 10)
@@ -109,7 +108,7 @@ struct RecentComparisonsFeatureTests {
         let store = TestStore(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.onAppear)
@@ -130,7 +129,7 @@ struct RecentComparisonsFeatureTests {
         let store = TestStore(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.onAppear)
@@ -145,7 +144,7 @@ struct RecentComparisonsFeatureTests {
         let store = TestStore(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.onAppear)
@@ -163,7 +162,7 @@ struct RecentComparisonsFeatureTests {
         let store = TestStore(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.onAppear)
@@ -188,7 +187,7 @@ struct RecentComparisonsFeatureTests {
         let store = TestStore(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.onAppear)
@@ -203,7 +202,7 @@ struct RecentComparisonsFeatureTests {
         let store = TestStore(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.onAppear)
@@ -230,7 +229,7 @@ struct RecentComparisonsFeatureTests {
         let store = TestStore(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.onAppear)
@@ -245,7 +244,7 @@ struct RecentComparisonsFeatureTests {
         let store = TestStore(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.onAppear)
@@ -261,7 +260,7 @@ struct RecentComparisonsFeatureTests {
         let store = TestStore(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase()
+            try! $0.bootstrapDatabase(useTest: true)
         }
         
         await store.send(.onAppear)
