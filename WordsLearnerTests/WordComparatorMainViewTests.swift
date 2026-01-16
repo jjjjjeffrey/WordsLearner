@@ -27,7 +27,8 @@ struct WordComparatorMainViewTests {
                 try! $0.bootstrapDatabase()
             }
         )
-        assertSnapshot(of: view, as: .image)
+        assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .light)))
+        assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .dark)))
     }
     
     @Test
@@ -40,7 +41,8 @@ struct WordComparatorMainViewTests {
                 try! $0.bootstrapDatabase(useTest: true)
             }
         )
-        assertSnapshot(of: view, as: .image)
+        assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .light)))
+        assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .dark)))
     }
     
     @Test
@@ -59,7 +61,8 @@ struct WordComparatorMainViewTests {
                 try! $0.bootstrapDatabase(useTest: true)
             }
         )
-        assertSnapshot(of: view, as: .image)
+        assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .light)))
+        assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .dark)))
     }
     
     @Test
@@ -72,6 +75,7 @@ struct WordComparatorMainViewTests {
                 try! $0.bootstrapDatabase()
             }
         )
-        assertSnapshot(of: view, as: .image)
+        assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .light)))
+        assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .dark)))
     }
 }
