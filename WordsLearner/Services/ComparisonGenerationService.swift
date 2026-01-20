@@ -204,11 +204,9 @@ extension ComparisonGenerationServiceClient: DependencyKey {
     static let testValue = Self(
         generateComparison: { _, _, _ in
             AsyncThrowingStream { continuation in
-                Task {
-                    let message = streamString
-                    continuation.yield(message)
-                    continuation.finish()
-                }
+                let message = streamString
+                continuation.yield(message)
+                continuation.finish()
             }
         },
         saveToHistory: { _, _, _, _ in }
