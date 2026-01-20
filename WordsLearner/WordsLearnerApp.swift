@@ -12,10 +12,12 @@ import SQLiteData
 @main
 struct EnglishWordComparatorApp: App {
     init() {
+        guard !isTesting else { return }
+        
         // Bootstrap database on app launch
         try! prepareDependencies {
             #if DEBUG
-            $0.comparisonGenerator = .testValue
+            $0.comparisonGenerator = .previewValue
             try $0.bootstrapDatabase(useTest: true)
             #else
             try $0.bootstrapDatabase()

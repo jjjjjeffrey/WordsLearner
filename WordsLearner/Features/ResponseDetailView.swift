@@ -10,25 +10,21 @@ import SwiftUI
 
 struct ResponseDetailView: View {
     let store: StoreOf<ResponseDetailFeature>
-    
+    @State private var position = ScrollPosition(edge: .top)
     var body: some View {
         VStack(spacing: 0) {
             headerSection
-            
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 16) {
-                        comparisonInfoCard
-                        streamingResponseView
-                        Spacer(minLength: 100)
-                    }
-                    .padding()
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    comparisonInfoCard
+                    streamingResponseView
+                    Spacer(minLength: 100)
                 }
-                .onChange(of: store.streamingResponse) { _ in
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        proxy.scrollTo("bottom", anchor: .bottom)
-                    }
-                }
+                .padding()
+            }
+            .scrollPosition($position)
+            .onChange(of: store.scrollToBottomId) { _, _ in
+                position.scrollTo(edge: .bottom)
             }
         }
         .navigationTitle("Comparison Result")
@@ -138,14 +134,14 @@ struct ResponseDetailView: View {
             Label("AI Analysis", systemImage: "brain.head.profile")
                 .font(.headline)
             
-            if store.streamingResponse.isEmpty && !store.isStreaming {
+            if store.attributedString.characters.isEmpty && !store.isStreaming {
                 ContentUnavailableView(
                     "No Response Yet",
                     systemImage: "text.bubble",
                     description: Text("The AI analysis will appear here")
                 )
             } else {
-                MarkdownText(store.streamingResponse)
+                MarkdownText(store.attributedString)
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
@@ -176,7 +172,7 @@ struct ResponseDetailView: View {
 
 #Preview {
     withDependencies {
-        $0.comparisonGenerator = .testValue
+        $0.comparisonGenerator = .previewValue
     } operation: {
         NavigationStack {
             ResponseDetailView(

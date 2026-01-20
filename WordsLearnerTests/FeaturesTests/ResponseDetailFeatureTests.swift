@@ -44,13 +44,20 @@ struct ResponseDetailFeatureTests {
         }
         
         // Send first chunk
-        continuation.yield("First chunk ")
-        await store.receive(.streamChunkReceived("First chunk ")) {
-            $0.streamingResponse = "First chunk "
+        let string = "First chunk "
+        continuation.yield(string)
+        await store.receive(.streamChunkReceived(string)) {
+            $0.streamingResponse = string
         }
         
         // Complete the stream
         continuation.finish()
+        let rendered = await AttributedStringRenderer.renderMarkdown(string)
+        await store.receive(.attributedStringRendered(rendered)) {
+            $0.attributedString = rendered
+            $0.scrollToBottomId += 1
+        }
+        
         await store.receive(.streamCompleted) {
             $0.isStreaming = false
         }
@@ -74,6 +81,25 @@ struct ResponseDetailFeatureTests {
         
         await store.send(.onAppear)
         // Should not send any action when shouldStartStreaming is false
+    }
+    
+    @Test
+    func testOnAppearWithShouldNotStartStreamingWithExistingStreamResponse() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "word1",
+            word2: "word2",
+            sentence: "This is a sentence",
+            streamingResponse: "This is a streamingResponse",
+            shouldStartStreaming: false
+        )) {
+            ResponseDetailFeature()
+        }
+        
+        await store.send(.onAppear)
+        let rendered = await AttributedStringRenderer.renderMarkdown("This is a streamingResponse")
+        await store.receive(.attributedStringRendered(rendered)) {
+            $0.attributedString = rendered
+        }
     }
     
     // MARK: - Streaming Flow Tests
@@ -103,21 +129,42 @@ struct ResponseDetailFeatureTests {
         }
         
         // Send first chunk
-        continuation.yield("First chunk ")
-        await store.receive(.streamChunkReceived("First chunk ")) {
-            $0.streamingResponse = "First chunk "
+        let firstChunk = "First chunk "
+        continuation.yield(firstChunk)
+        await store.receive(.streamChunkReceived(firstChunk)) {
+            $0.streamingResponse = firstChunk
+        }
+        
+        let firstChunkRendered = await AttributedStringRenderer.renderMarkdown(firstChunk)
+        await store.receive(.attributedStringRendered(firstChunkRendered)) {
+            $0.attributedString = firstChunkRendered
+            $0.scrollToBottomId += 1
         }
         
         // Send second chunk
-        continuation.yield("Second chunk ")
-        await store.receive(.streamChunkReceived("Second chunk ")) {
-            $0.streamingResponse = "First chunk Second chunk "
+        let secondChunk = "Second chunk "
+        continuation.yield(secondChunk)
+        await store.receive(.streamChunkReceived(secondChunk)) {
+            $0.streamingResponse = firstChunk + secondChunk
+        }
+        
+        let secondChunkRendered = await AttributedStringRenderer.renderMarkdown(firstChunk + secondChunk)
+        await store.receive(.attributedStringRendered(secondChunkRendered)) {
+            $0.attributedString = secondChunkRendered
+            $0.scrollToBottomId += 1
         }
         
         // Send third chunk
-        continuation.yield("Third chunk")
-        await store.receive(.streamChunkReceived("Third chunk")) {
-            $0.streamingResponse = "First chunk Second chunk Third chunk"
+        let thirdChunk = "Third chunk"
+        continuation.yield(thirdChunk)
+        await store.receive(.streamChunkReceived(thirdChunk)) {
+            $0.streamingResponse = firstChunk + secondChunk + thirdChunk
+        }
+        
+        let thirdChunkRendered = await AttributedStringRenderer.renderMarkdown(firstChunk + secondChunk + thirdChunk)
+        await store.receive(.attributedStringRendered(thirdChunkRendered)) {
+            $0.attributedString = thirdChunkRendered
+            $0.scrollToBottomId += 1
         }
         
         // Complete the stream
@@ -132,25 +179,44 @@ struct ResponseDetailFeatureTests {
     
     @Test
     func testStreamChunkReceived() async {
+        let initialResponse = "Initial "
         let store = TestStore(initialState: ResponseDetailFeature.State(
             word1: "word1",
             word2: "word2",
             sentence: "This is a sentence",
-            streamingResponse: "Initial "
+            streamingResponse: initialResponse
         )) {
             ResponseDetailFeature()
         }
         
-        await store.send(.streamChunkReceived("chunk1 ")) {
-            $0.streamingResponse = "Initial chunk1 "
+        let firstChunk = "chunk1 "
+        await store.send(.streamChunkReceived(firstChunk)) {
+            $0.streamingResponse = initialResponse + firstChunk
         }
         
-        await store.send(.streamChunkReceived("chunk2 ")) {
-            $0.streamingResponse = "Initial chunk1 chunk2 "
+        let firstChunkRendered = await AttributedStringRenderer.renderMarkdown(initialResponse + firstChunk)
+        await store.receive(.attributedStringRendered(firstChunkRendered)) {
+            $0.attributedString = firstChunkRendered
         }
         
-        await store.send(.streamChunkReceived("chunk3")) {
-            $0.streamingResponse = "Initial chunk1 chunk2 chunk3"
+        let secondChunk = "chunk2 "
+        await store.send(.streamChunkReceived(secondChunk)) {
+            $0.streamingResponse = initialResponse + firstChunk + secondChunk
+        }
+        
+        let secondChunkRendered = await AttributedStringRenderer.renderMarkdown(initialResponse + firstChunk + secondChunk)
+        await store.receive(.attributedStringRendered(secondChunkRendered)) {
+            $0.attributedString = secondChunkRendered
+        }
+        
+        let thirdChunk = "chunk3 "
+        await store.send(.streamChunkReceived(thirdChunk)) {
+            $0.streamingResponse = initialResponse + firstChunk + secondChunk + thirdChunk
+        }
+        
+        let thirdChunkRendered = await AttributedStringRenderer.renderMarkdown(initialResponse + firstChunk + secondChunk + thirdChunk)
+        await store.receive(.attributedStringRendered(thirdChunkRendered)) {
+            $0.attributedString = thirdChunkRendered
         }
     }
     
@@ -237,6 +303,12 @@ struct ResponseDetailFeatureTests {
             $0.streamingResponse = "Test response"
         }
         
+        let rendered = await AttributedStringRenderer.renderMarkdown("Test response")
+        await store.receive(.attributedStringRendered(rendered)) {
+            $0.attributedString = rendered
+            $0.scrollToBottomId += 1
+        }
+        
         // Complete the stream
         continuation.finish()
         await store.receive(.streamCompleted) {
@@ -291,9 +363,21 @@ struct ResponseDetailFeatureTests {
             $0.streamingResponse = "Response "
         }
         
+        let firstRendered = await AttributedStringRenderer.renderMarkdown("Response ")
+        await store.receive(.attributedStringRendered(firstRendered)) {
+            $0.attributedString = firstRendered
+            $0.scrollToBottomId += 1
+        }
+        
         continuation.yield("text")
         await store.receive(.streamChunkReceived("text")) {
             $0.streamingResponse = "Response text"
+        }
+        
+        let secondRendered = await AttributedStringRenderer.renderMarkdown("Response text")
+        await store.receive(.attributedStringRendered(secondRendered)) {
+            $0.attributedString = secondRendered
+            $0.scrollToBottomId += 1
         }
         
         // Complete the stream

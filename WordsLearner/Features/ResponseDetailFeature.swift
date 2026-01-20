@@ -17,6 +17,8 @@ struct ResponseDetailFeature {
         let word2: String
         let sentence: String
         var streamingResponse: String = ""
+        var attributedString: AttributedString = AttributedString()
+        var scrollToBottomId: Int = 0
         var isStreaming: Bool = false
         var errorMessage: String? = nil
         var shouldStartStreaming: Bool = true
@@ -27,6 +29,7 @@ struct ResponseDetailFeature {
         case startStreaming
         case streamChunkReceived(String)
         case streamCompleted
+        case attributedStringRendered(AttributedString)
         case streamFailed(String)
         case shareButtonTapped
         case comparisonSaved
@@ -37,7 +40,15 @@ struct ResponseDetailFeature {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                guard state.shouldStartStreaming else { return .none }
+                guard state.shouldStartStreaming else {
+                    if state.streamingResponse.isEmpty {
+                        return .none
+                    }
+                    return .run { [ streamingResponse = state.streamingResponse ] send in
+                        let processed = await AttributedStringRenderer.renderMarkdown(streamingResponse)
+                        await send(.attributedStringRendered(processed))
+                    }
+                }
                 return .send(.startStreaming)
                 
             case .startStreaming:
@@ -58,8 +69,14 @@ struct ResponseDetailFeature {
                 
             case let .streamChunkReceived(chunk):
                 state.streamingResponse += chunk
+                return .run { [ streamingResponse = state.streamingResponse ] send in
+                    let processed = await AttributedStringRenderer.renderMarkdown(streamingResponse)
+                    await send(.attributedStringRendered(processed))
+                }
+            case let .attributedStringRendered(attributedString):
+                state.attributedString = attributedString
+                if state.isStreaming { state.scrollToBottomId+=1 }
                 return .none
-                
             case .streamCompleted:
                 state.isStreaming = false
                 return .run { [word1 = state.word1, word2 = state.word2, sentence = state.sentence, response = state.streamingResponse] send in
