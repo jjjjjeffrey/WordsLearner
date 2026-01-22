@@ -158,7 +158,31 @@ struct ComparisonHistoryListView: View {
 
 #Preview("Not empty") {
     withDependencies {
-        try! $0.bootstrapDatabase()
+        try! $0.bootstrapDatabase(
+            useTest: true,
+            seed: { db in
+                try db.seed {
+                    ComparisonHistory(
+                        id: UUID(),
+                        word1: "accept",
+                        word2: "except",
+                        sentence: "I accept all terms.",
+                        response: "Use 'accept' for receive/agree, 'except' for excluding.",
+                        date: Date().addingTimeInterval(-3600),
+                        isRead: false
+                    )
+                    ComparisonHistory(
+                        id: UUID(),
+                        word1: "affect",
+                        word2: "effect",
+                        sentence: "How does this affect the result?",
+                        response: "'Affect' is usually a verb; 'effect' is usually a noun.",
+                        date: Date(),
+                        isRead: true
+                    )
+                }
+            }
+        )
     } operation: {
         NavigationStack {
             ComparisonHistoryListView(

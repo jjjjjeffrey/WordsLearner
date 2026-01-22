@@ -15,10 +15,13 @@ private let logger = Logger(subsystem: "WordsLearner", category: "Database")
 
 extension DependencyValues {
     /// Bootstrap the app database
-    mutating func bootstrapDatabase(useTest: Bool = false) throws {
+    mutating func bootstrapDatabase(
+        useTest: Bool = false,
+        seed: ((Database) throws -> Void)? = nil
+    ) throws {
         @Dependency(\.context) var context
         
-        let database = try createAppDatabase(useTest: useTest)
+        let database = try createAppDatabase(useTest: useTest, seed: seed)
         
         logger.debug(
             """
@@ -33,7 +36,10 @@ extension DependencyValues {
 
 /// Creates and configures the app database
 
-func createAppDatabase(useTest: Bool) throws -> any DatabaseWriter {
+func createAppDatabase(
+    useTest: Bool,
+    seed: ((Database) throws -> Void)? = nil
+) throws -> any DatabaseWriter {
     @Dependency(\.context) var context
     
     var configuration = Configuration()
@@ -219,7 +225,11 @@ func createAppDatabase(useTest: Bool) throws -> any DatabaseWriter {
     // Seed preview data
     if context != .live && useTest {
         migrator.registerMigration("Seed some preview data") { db in
-            try db.seedSampleData()
+            if let seed {
+                try seed(db)
+            } else {
+                try db.seedSampleData()
+            }
         }
     }
 #endif
