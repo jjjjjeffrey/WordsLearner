@@ -76,6 +76,11 @@ struct ComparisonHistoryListViewTests {
             initialState: ComparisonHistoryListFeature.State()
         ) {
             ComparisonHistoryListFeature()
+        } withDependencies: {
+            try! $0.bootstrapDatabase(
+                useTest: true,
+                seed: { _ in }
+            )
         }
 
         let view = NavigationStack {

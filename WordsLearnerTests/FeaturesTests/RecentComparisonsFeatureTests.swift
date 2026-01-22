@@ -14,6 +14,9 @@ import Testing
 @testable import WordsLearner
 
 @MainActor
+@Suite(
+    .dependency(\.date.now, Date(timeIntervalSince1970: 1_234_567_890))
+)
 struct RecentComparisonsFeatureTests {
     
     // MARK: - Initial State Tests
@@ -35,19 +38,44 @@ struct RecentComparisonsFeatureTests {
     
     @Test
     func comparisonTapped_marksReadAndSendsDelegate() async throws {
+        @Dependency(\.date.now) var now
         let store = TestStore(initialState: RecentComparisonsFeature.State()) {
             RecentComparisonsFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase(useTest: true)
+            try! $0.bootstrapDatabase(
+                useTest: true,
+                seed: { db in
+                    try db.seed {
+                        ComparisonHistory(
+                            id: UUID(),
+                            word1: "accept",
+                            word2: "except",
+                            sentence: "I accept all terms except the final clause.",
+                            response: "Use 'accept' for receive/agree, 'except' for excluding.",
+                            date: now,
+                            isRead: false
+                        )
+                        ComparisonHistory(
+                            id: UUID(),
+                            word1: "affect",
+                            word2: "effect",
+                            sentence: "How does this affect the final effect?",
+                            response: "'Affect' is usually a verb; 'effect' is usually a noun.",
+                            date: now.addingTimeInterval(-3600),
+                            isRead: false
+                        )
+                    }
+                }
+            )
         }
         
-        #expect(store.state.recentComparisons.count == 10)
+        #expect(store.state.recentComparisons.count == 2)
         
         // Most recent should be the one with the later date
         let tapped = store.state.recentComparisons[0]
         #expect(tapped.isRead == false)
         await store.send(.comparisonTapped(tapped))
-        await store.finish(timeout: 200)
+        await store.finish()
         await store.receive(.delegate(.comparisonSelected(tapped)))
         #expect(store.state.recentComparisons[0].isRead == true)
         #expect(store.state.recentComparisons[1].isRead == false)
