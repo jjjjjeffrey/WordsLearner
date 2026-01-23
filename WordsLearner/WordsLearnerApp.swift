@@ -17,11 +17,15 @@ struct EnglishWordComparatorApp: App {
         // Bootstrap database on app launch
         try! prepareDependencies {
             #if DEBUG
-            $0.comparisonGenerator = .previewValue
+            $0.comparisonGenerator = .liveValue
             try $0.bootstrapDatabase(useTest: true)
             #else
             try $0.bootstrapDatabase()
             #endif
+            $0.defaultSyncEngine = try SyncEngine(
+                for: $0.defaultDatabase,
+                tables: ComparisonHistory.self, BackgroundTask.self
+            )
         }
         
         // Start background task processing
