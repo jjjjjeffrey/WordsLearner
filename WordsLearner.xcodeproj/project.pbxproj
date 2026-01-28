@@ -7,9 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0012AB382ECC37DD003E40E4 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = 0012AB372ECC37DD003E40E4 /* ComposableArchitecture */; };
-		0012AB3B2ECC382F003E40E4 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 0012AB3A2ECC382F003E40E4 /* SQLiteData */; };
 		0012AB3D2ECC382F003E40E4 /* SQLiteDataTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 0012AB3C2ECC382F003E40E4 /* SQLiteDataTestSupport */; };
+		006A55C12F29DAEE00938301 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 006A55C02F29DAEE00938301 /* SQLiteData */; };
+		006A55C32F29DB1D00938301 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = 006A55C22F29DB1D00938301 /* ComposableArchitecture */; };
 		009835D12F175BC00012E447 /* InlineSnapshotTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 009835D02F175BC00012E447 /* InlineSnapshotTesting */; };
 		009835D32F175BC00012E447 /* SnapshotTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 009835D22F175BC00012E447 /* SnapshotTesting */; };
 		009835D52F175BC00012E447 /* SnapshotTestingCustomDump in Frameworks */ = {isa = PBXBuildFile; productRef = 009835D42F175BC00012E447 /* SnapshotTestingCustomDump */; };
@@ -63,9 +63,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0012AB3B2ECC382F003E40E4 /* SQLiteData in Frameworks */,
-				0012AB382ECC37DD003E40E4 /* ComposableArchitecture in Frameworks */,
+				006A55C12F29DAEE00938301 /* SQLiteData in Frameworks */,
 				00B953392EC59D4600D80764 /* Markdown in Frameworks */,
+				006A55C32F29DB1D00938301 /* ComposableArchitecture in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -120,6 +120,7 @@
 				0051EDC42EC44A8D008DB61F /* Sources */,
 				0051EDC52EC44A8D008DB61F /* Frameworks */,
 				0051EDC62EC44A8D008DB61F /* Resources */,
+				006A55C52F29DC3400938301 /* ShellScript */,
 			);
 			buildRules = (
 			);
@@ -131,8 +132,8 @@
 			name = WordsLearner;
 			packageProductDependencies = (
 				00B953382EC59D4600D80764 /* Markdown */,
-				0012AB372ECC37DD003E40E4 /* ComposableArchitecture */,
-				0012AB3A2ECC382F003E40E4 /* SQLiteData */,
+				006A55C02F29DAEE00938301 /* SQLiteData */,
+				006A55C22F29DB1D00938301 /* ComposableArchitecture */,
 			);
 			productName = WordsLearner;
 			productReference = 0051EDC82EC44A8D008DB61F /* WordsLearner.app */;
@@ -228,6 +229,26 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		006A55C52F29DC3400938301 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\nSRC_DIR=\"${BUILT_PRODUCTS_DIR}/PackageFrameworks\"\nDST_DIR=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Contents/Frameworks\"\n\nif [ ! -d \"$SRC_DIR\" ]; then\n  exit 0\nfi\n\nmkdir -p \"$DST_DIR\"\n\n# Copy all SwiftPM-built dynamic frameworks into the app bundle\nfor FW in \"$SRC_DIR\"/*.framework; do\n  [ -d \"$FW\" ] || continue\n  /usr/bin/rsync -a --delete \"$FW\" \"$DST_DIR/\"\ndone\n\n# Sign them with the same identity as the app (required by Library Validation)\nfor FW in \"$DST_DIR\"/*.framework; do\n  [ -d \"$FW\" ] || continue\n  /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n    --timestamp=none --preserve-metadata=identifier,entitlements \\\n    --deep \"$FW\"\ndone\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		0051EDC42EC44A8D008DB61F /* Sources */ = {
@@ -400,6 +421,7 @@
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WordsLearner/Info.plist;
@@ -413,7 +435,10 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jeffrey.wordslearner;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -421,6 +446,8 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -469,7 +496,10 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jeffrey.wordslearner;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -482,6 +512,8 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -497,13 +529,28 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = NM2U2J6H34;
+				DEVELOPMENT_TEAM = N2328YCXM3;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(LD_RUNPATH_SEARCH_PATHS_SHALLOW_BUNDLE_$(SHALLOW_BUNDLE))",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wordslearner.jeffrey.WordsLearnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
@@ -519,13 +566,28 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = NM2U2J6H34;
+				DEVELOPMENT_TEAM = N2328YCXM3;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(LD_RUNPATH_SEARCH_PATHS_SHALLOW_BUNDLE_$(SHALLOW_BUNDLE))",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wordslearner.jeffrey.WordsLearnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
@@ -611,20 +673,20 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		0012AB372ECC37DD003E40E4 /* ComposableArchitecture */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 0012AB362ECC37DD003E40E4 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
-			productName = ComposableArchitecture;
-		};
-		0012AB3A2ECC382F003E40E4 /* SQLiteData */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 0012AB392ECC382F003E40E4 /* XCRemoteSwiftPackageReference "sqlite-data" */;
-			productName = SQLiteData;
-		};
 		0012AB3C2ECC382F003E40E4 /* SQLiteDataTestSupport */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0012AB392ECC382F003E40E4 /* XCRemoteSwiftPackageReference "sqlite-data" */;
 			productName = SQLiteDataTestSupport;
+		};
+		006A55C02F29DAEE00938301 /* SQLiteData */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0012AB392ECC382F003E40E4 /* XCRemoteSwiftPackageReference "sqlite-data" */;
+			productName = SQLiteData;
+		};
+		006A55C22F29DB1D00938301 /* ComposableArchitecture */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0012AB362ECC37DD003E40E4 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
+			productName = ComposableArchitecture;
 		};
 		009835D02F175BC00012E447 /* InlineSnapshotTesting */ = {
 			isa = XCSwiftPackageProductDependency;
