@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 import ComposableArchitecture
 import DependenciesTestSupport
 import SnapshotTesting
@@ -36,8 +39,14 @@ struct RecentComparisonsViewTests {
             .padding()
             .frame(width: 390)
 
+#if os(macOS)
+        let hosting = NSHostingController(rootView: view)
+        let size = measuredFittingSize(for: view, width: 390)
+        assertSnapshot(of: hosting, as: .imageHiDPI(size: size), named: "macOS")
+#elseif os(iOS) || os(tvOS)
         assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .light)))
         assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .dark)))
+#endif
     }
 
     @Test
@@ -79,7 +88,13 @@ struct RecentComparisonsViewTests {
             .padding()
             .frame(width: 390)
 
+#if os(macOS)
+        let hosting = NSHostingController(rootView: view)
+        let size = measuredFittingSize(for: view, width: 390)
+        assertSnapshot(of: hosting, as: .imageHiDPI(size: size), named: "macOS")
+#elseif os(iOS) || os(tvOS)
         assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .light)))
         assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .dark)))
+#endif
     }
 }

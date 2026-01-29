@@ -34,6 +34,7 @@ struct WordComparatorMainView: View {
                 }
                 .padding()
             }
+            .background(AppColors.background)
             .navigationTitle("Word Comparator")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.large)

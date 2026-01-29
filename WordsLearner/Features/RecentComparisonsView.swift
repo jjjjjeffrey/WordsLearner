@@ -28,6 +28,7 @@ struct RecentComparisonsView: View {
         .onAppear {
             store.send(.onAppear)
         }
+        .background(AppColors.background)
         .alert("Clear All Comparisons?", isPresented: $showingClearAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Clear All", role: .destructive) {

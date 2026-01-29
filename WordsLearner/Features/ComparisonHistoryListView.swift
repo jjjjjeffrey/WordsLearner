@@ -25,6 +25,7 @@ struct ComparisonHistoryListView: View {
             get: { store.searchText },
             set: { store.send(.textChanged($0)) }
         ), prompt: "Search words or sentence")
+        .background(AppColors.background)
         .toolbar {
             #if os(iOS)
             ToolbarItem(placement: .navigationBarLeading) {

@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 import ComposableArchitecture
 import SnapshotTesting
 import Testing
@@ -37,10 +40,20 @@ struct ResponseDetailViewTests {
         let view = NavigationStack {
             ResponseDetailView(store: store)
         }
-        .frame(width: 390, height: 844)
-        
+#if os(macOS)
+            .frame(width: 500)
+#elseif os(iOS) || os(tvOS)
+            .frame(width: 390, height: 844)
+#endif
+
+#if os(macOS)
+        let hosting = NSHostingController(rootView: view)
+        let size = measuredFittingSize(for: view, width: 500)
+        assertSnapshot(of: hosting, as: .imageHiDPI(size: size), named: "macOS")
+#elseif os(iOS) || os(tvOS)
         assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .light)))
         assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .dark)))
+#endif
     }
     
     @Test
@@ -68,10 +81,20 @@ struct ResponseDetailViewTests {
 
         let view = NavigationStack {
             ResponseDetailView(store: store)
-        }.frame(width: 390, height: 844)
+        }
+#if os(macOS)
+            .frame(width: 500)
+#elseif os(iOS) || os(tvOS)
+            .frame(width: 390, height: 844)
+#endif
 
+#if os(macOS)
+        let hosting = NSHostingController(rootView: view)
+        let size = measuredFittingSize(for: view, width: 500)
+        assertSnapshot(of: hosting, as: .imageHiDPI(size: size), named: "macOS")
+#elseif os(iOS) || os(tvOS)
         assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .light)))
         assertSnapshot(of: view, as: .image(traits: .init(userInterfaceStyle: .dark)))
+#endif
     }
 }
-

@@ -28,6 +28,7 @@ struct BackgroundTasksView: View {
         .toolbar {
             toolbarContent
         }
+        .background(AppColors.background)
         .onAppear {
             store.send(.onAppear)
         }
@@ -268,5 +269,4 @@ struct StatusBadge: View {
         )
     }
 }
-
 

@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 import ComposableArchitecture
 import DependenciesTestSupport
 import SnapshotTesting
@@ -58,6 +61,11 @@ struct ComparisonHistoryListViewTests {
             ComparisonHistoryListView(store: store)
         }
 
+#if os(macOS)
+        let hosting = NSHostingController(rootView: view)
+        let size = measuredFittingSize(for: view, width: 500)
+        assertSnapshot(of: hosting, as: .imageHiDPI(size: size), named: "macOS")
+#elseif os(iOS) || os(tvOS)
         assertSnapshot(
             of: view,
             as: .image(traits: .init(userInterfaceStyle: .light)),
@@ -68,6 +76,7 @@ struct ComparisonHistoryListViewTests {
             as: .image(traits: .init(userInterfaceStyle: .dark)),
             named: "2"
         )
+#endif
     }
     
     @Test
@@ -87,6 +96,11 @@ struct ComparisonHistoryListViewTests {
             ComparisonHistoryListView(store: store)
         }
 
+#if os(macOS)
+        let hosting = NSHostingController(rootView: view)
+        let size = measuredFittingSize(for: view, width: 500)
+        assertSnapshot(of: hosting, as: .imageHiDPI(size: size), named: "macOS")
+#elseif os(iOS) || os(tvOS)
         assertSnapshot(
             of: view,
             as: .image(traits: .init(userInterfaceStyle: .light)),
@@ -97,5 +111,6 @@ struct ComparisonHistoryListViewTests {
             as: .image(traits: .init(userInterfaceStyle: .dark)),
             named: "2"
         )
+#endif
     }
 }

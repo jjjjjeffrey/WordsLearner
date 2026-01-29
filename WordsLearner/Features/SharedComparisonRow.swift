@@ -101,6 +101,7 @@ struct SharedComparisonRow: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .background(AppColors.background)
         #if os(macOS)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.2)) {

@@ -246,7 +246,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\n\nSRC_DIR=\"${BUILT_PRODUCTS_DIR}/PackageFrameworks\"\nDST_DIR=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Contents/Frameworks\"\n\nif [ ! -d \"$SRC_DIR\" ]; then\n  exit 0\nfi\n\nmkdir -p \"$DST_DIR\"\n\n# Copy all SwiftPM-built dynamic frameworks into the app bundle\nfor FW in \"$SRC_DIR\"/*.framework; do\n  [ -d \"$FW\" ] || continue\n  /usr/bin/rsync -a --delete \"$FW\" \"$DST_DIR/\"\ndone\n\n# Sign them with the same identity as the app (required by Library Validation)\nfor FW in \"$DST_DIR\"/*.framework; do\n  [ -d \"$FW\" ] || continue\n  /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n    --timestamp=none --preserve-metadata=identifier,entitlements \\\n    --deep \"$FW\"\ndone\n";
+			shellScript = "set -euo pipefail\n\nif [ \"${PLATFORM_NAME}\" != \"macosx\" ]; then\n  exit 0\nfi\n\nSRC_DIR=\"${BUILT_PRODUCTS_DIR}/PackageFrameworks\"\nDST_DIR=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Contents/Frameworks\"\n\nif [ ! -d \"$SRC_DIR\" ]; then\n  exit 0\nfi\n\nmkdir -p \"$DST_DIR\"\n\n# Copy all SwiftPM-built dynamic frameworks into the app bundle\nfor FW in \"$SRC_DIR\"/*.framework; do\n  [ -d \"$FW\" ] || continue\n  /usr/bin/rsync -a --delete \"$FW\" \"$DST_DIR/\"\ndone\n\n# Sign them with the same identity as the app (required by Library Validation)\nfor FW in \"$DST_DIR\"/*.framework; do\n  [ -d \"$FW\" ] || continue\n  /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n    --timestamp=none --preserve-metadata=identifier,entitlements \\\n    --deep \"$FW\"\ndone\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

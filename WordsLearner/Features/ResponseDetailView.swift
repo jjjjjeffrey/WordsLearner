@@ -42,6 +42,7 @@ struct ResponseDetailView: View {
             }
             #endif
         }
+        .background(AppColors.background)
         .onAppear {
             store.send(.onAppear)
         }
@@ -193,6 +194,5 @@ struct ResponseDetailView: View {
         }
     }
 }
-
 
 
