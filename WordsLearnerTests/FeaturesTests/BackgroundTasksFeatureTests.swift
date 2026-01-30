@@ -18,13 +18,67 @@ struct BackgroundTasksFeatureTests {
     
     // MARK: - Helpers
     
+    private let seedBaseDate = Date(timeIntervalSince1970: 1_700_000_000)
+    
+    private func seedBackgroundTasks(in db: Database) throws {
+        let now = seedBaseDate
+        try db.seed {
+            BackgroundTask.Draft(
+                id: UUID(),
+                word1: "accept",
+                word2: "except",
+                sentence: "I accept all terms.",
+                status: BackgroundTask.Status.pending.rawValue,
+                response: "",
+                error: nil,
+                createdAt: now,
+                updatedAt: now
+            )
+            BackgroundTask.Draft(
+                id: UUID(),
+                word1: "advice",
+                word2: "advise",
+                sentence: "Can you give me some advice?",
+                status: BackgroundTask.Status.completed.rawValue,
+                response: "Test response for advice vs advise...",
+                error: nil,
+                createdAt: now.addingTimeInterval(-3600),
+                updatedAt: now.addingTimeInterval(-1800)
+            )
+            BackgroundTask.Draft(
+                id: UUID(),
+                word1: "complement",
+                word2: "compliment",
+                sentence: "Your shoes complement the outfit.",
+                status: BackgroundTask.Status.generating.rawValue,
+                response: "",
+                error: nil,
+                createdAt: now.addingTimeInterval(-7200),
+                updatedAt: now.addingTimeInterval(-3600)
+            )
+            BackgroundTask.Draft(
+                id: UUID(),
+                word1: "principle",
+                word2: "principal",
+                sentence: "Honesty is the best principle.",
+                status: BackgroundTask.Status.failed.rawValue,
+                response: "",
+                error: "Simulated failure during generation.",
+                createdAt: now.addingTimeInterval(-10800),
+                updatedAt: now.addingTimeInterval(-7200)
+            )
+        }
+    }
+    
     private func makeStore(
-        backgroundTaskManager: BackgroundTaskManagerClient? = nil
+        backgroundTaskManager: BackgroundTaskManagerClient? = nil,
+        seed: ((Database) throws -> Void)? = nil
     ) -> TestStoreOf<BackgroundTasksFeature> {
         TestStore(initialState: BackgroundTasksFeature.State()) {
             BackgroundTasksFeature()
         } withDependencies: {
-            try! $0.bootstrapDatabase(useTest: true)
+            let seed = seed ?? seedBackgroundTasks(in:)
+            try! $0.bootstrapDatabase(useTest: true, seed: seed)
             if let backgroundTaskManager {
                 $0.backgroundTaskManager = backgroundTaskManager
             }
@@ -37,7 +91,6 @@ struct BackgroundTasksFeatureTests {
     func initialState_loadsSeedDataAndComputedProperties() async throws {
         let store = makeStore()
         
-        // Seed data in DatabaseConfiguration.swift inserts 4 BackgroundTask rows.
         #expect(store.state.tasks.count == 4)
         #expect(store.state.isEmpty == false)
         
@@ -267,11 +320,10 @@ struct BackgroundTasksFeatureTests {
         let tasks = store.state.tasks
         #expect(tasks.count == 4)
         
-        // Seed order: Date() (pending "accept"), -3600 (completed "advice"), -7200 (generating "complement"), -10800 (failed "principle")
+        // Seed order: base (pending "accept"), -3600 (completed "advice"), -7200 (generating "complement"), -10800 (failed "principle")
         #expect(tasks.first?.word1 == "accept")
         #expect(tasks.dropFirst().first?.word1 == "advice")
         #expect(tasks.dropFirst(2).first?.word1 == "complement")
         #expect(tasks.dropFirst(3).first?.word1 == "principle")
     }
 }
-
