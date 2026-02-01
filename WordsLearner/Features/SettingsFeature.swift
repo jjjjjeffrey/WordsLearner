@@ -35,7 +35,7 @@ struct SettingsFeature {
         }
     }
     
-    @Dependency(\.apiKeyManager) var apiKeyManager
+    private var apiKeyManager: APIKeyManagerClient { DependencyValues._current.apiKeyManager }
     @Dependency(\.dismiss) var dismiss
     
     var body: some Reducer<State, Action> {
@@ -136,4 +136,3 @@ private func maskAPIKey(_ key: String) -> String {
     let end = String(key.suffix(4))
     return "\(start)••••••••\(end)"
 }
-

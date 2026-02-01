@@ -11,15 +11,14 @@ import IssueReporting
 import OSLog
 import SQLiteData
 
-private let logger = Logger(subsystem: "WordsLearner", category: "Database")
-
 extension DependencyValues {
     /// Bootstrap the app database
     mutating func bootstrapDatabase(
         useTest: Bool = false,
-        seed: ((Database) throws -> Void)? = nil
+        seed: (@Sendable (Database) throws -> Void)? = nil
     ) throws {
         @Dependency(\.context) var context
+        let logger = Logger(subsystem: "WordsLearner", category: "Database")
         
         let database = try createAppDatabase(useTest: useTest, seed: seed)
         
@@ -38,9 +37,10 @@ extension DependencyValues {
 
 func createAppDatabase(
     useTest: Bool,
-    seed: ((Database) throws -> Void)? = nil
+    seed: (@Sendable (Database) throws -> Void)? = nil
 ) throws -> any DatabaseWriter {
     @Dependency(\.context) var context
+    let logger = Logger(subsystem: "WordsLearner", category: "Database")
     
     var configuration = Configuration()
     configuration.foreignKeysEnabled = true
@@ -241,7 +241,7 @@ func createAppDatabase(
 
 #if DEBUG
 extension Database {
-    func seedSampleData() throws {
+    nonisolated func seedSampleData() throws {
         // Seed some test data
         try seed {
             ComparisonHistory.Draft(

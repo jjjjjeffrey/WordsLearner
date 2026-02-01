@@ -10,16 +10,36 @@ import Foundation
 import SQLiteData
 import SwiftUI
 
+@MainActor
 @Reducer
 struct WordComparatorFeature {
     
+    @MainActor
     @Reducer
     enum Path {
+        @CasePathable
+        @dynamicMemberLookup
+        @ObservableState
+        enum State {
+            typealias StateReducer = Path
+            
+            case detail(ResponseDetailFeature.State)
+            case historyList(ComparisonHistoryListFeature.State)
+            case backgroundTasks(BackgroundTasksFeature.State)
+        }
+        
+        @CasePathable
+        enum Action {
+            case detail(ResponseDetailFeature.Action)
+            case historyList(ComparisonHistoryListFeature.Action)
+            case backgroundTasks(BackgroundTasksFeature.Action)
+        }
+        
         case detail(ResponseDetailFeature)
         case historyList(ComparisonHistoryListFeature)
         case backgroundTasks(BackgroundTasksFeature)
     }
-    
+
     @ObservableState
     struct State: Equatable {
         var word1: String = ""
@@ -73,8 +93,8 @@ struct WordComparatorFeature {
         }
     }
     
-    @Dependency(\.apiKeyManager) var apiKeyManager
-    @Dependency(\.backgroundTaskManager) var taskManager
+    private var apiKeyManager: APIKeyManagerClient { DependencyValues._current.apiKeyManager }
+    private var taskManager: BackgroundTaskManagerClient { DependencyValues._current.backgroundTaskManager }
     
     var body: some Reducer<State, Action> {
         BindingReducer()
@@ -211,6 +231,8 @@ struct WordComparatorFeature {
     }
 }
 
+extension WordComparatorFeature.Path.State: @MainActor CaseReducerState {}
+
 extension WordComparatorFeature.Path.State: Equatable {
     static func == (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
@@ -228,4 +250,3 @@ extension WordComparatorFeature.Path.State: Equatable {
         }
     }
 }
-

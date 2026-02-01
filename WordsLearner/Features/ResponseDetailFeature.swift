@@ -57,8 +57,10 @@ struct ResponseDetailFeature {
                 
                 return .run { [word1 = state.word1, word2 = state.word2, sentence = state.sentence] send in
                     do {
-                        @Dependency(\.comparisonGenerator) var generator
-                        for try await chunk in await generator.generateComparison(word1, word2, sentence) {
+                        let generator = await MainActor.run {
+                            DependencyValues._current.comparisonGenerator
+                        }
+                        for try await chunk in generator.generateComparison(word1, word2, sentence) {
                             await send(.streamChunkReceived(chunk))
                         }
                         await send(.streamCompleted)
@@ -81,7 +83,9 @@ struct ResponseDetailFeature {
                 state.isStreaming = false
                 return .run { [word1 = state.word1, word2 = state.word2, sentence = state.sentence, response = state.streamingResponse] send in
                     do {
-                        @Dependency(\.comparisonGenerator) var generator
+                        let generator = await MainActor.run {
+                            DependencyValues._current.comparisonGenerator
+                        }
                         try await generator.saveToHistory(
                             word1,
                             word2,

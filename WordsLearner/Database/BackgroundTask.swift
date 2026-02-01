@@ -36,7 +36,7 @@ extension BackgroundTask.Draft: Identifiable {}
 
 // Helper extensions
 extension BackgroundTask {
-    static func create(
+    nonisolated static func create(
         word1: String,
         word2: String,
         sentence: String,
@@ -55,7 +55,7 @@ extension BackgroundTask {
         )
     }
     
-    func updating(status: Status, error: String? = nil) -> Draft {
+    nonisolated func updating(status: Status, error: String? = nil) -> Draft {
         Draft(
             id: id,
             word1: word1,
@@ -69,7 +69,7 @@ extension BackgroundTask {
         )
     }
     
-    func updating(response: String, status: Status) -> Draft {
+    nonisolated func updating(response: String, status: Status) -> Draft {
         Draft(
             id: id,
             word1: word1,
@@ -83,4 +83,3 @@ extension BackgroundTask {
         )
     }
 }
-

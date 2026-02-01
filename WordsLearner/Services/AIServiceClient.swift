@@ -10,19 +10,20 @@ import Foundation
 
 // MARK: - AI Service Dependency
 
-struct AIServiceClient {
+struct AIServiceClient: Sendable {
     var streamResponse: @Sendable (String) -> AsyncThrowingStream<String, Error>
 }
 
 extension AIServiceClient: DependencyKey {
     static let liveValue = Self(
         streamResponse: { prompt in
-            let apiKeyManager = APIKeyManager.shared
-            let apiKey = apiKeyManager.getAPIKey()
-            
             return AsyncThrowingStream { continuation in
                 Task {
                     do {
+                        let apiKey = await MainActor.run {
+                            APIKeyManager.shared.getAPIKey()
+                        }
+
                         guard !apiKey.isEmpty else {
                             throw AIError.authenticationError
                         }
@@ -105,7 +106,7 @@ extension DependencyValues {
 
 // MARK: - API Key Manager Dependency
 
-struct APIKeyManagerClient {
+struct APIKeyManagerClient: Sendable {
     var hasValidAPIKey: @Sendable () -> Bool
     var getAPIKey: @Sendable () -> String
     var saveAPIKey: @Sendable (String) -> Bool
@@ -114,12 +115,23 @@ struct APIKeyManagerClient {
 }
 
 extension APIKeyManagerClient: DependencyKey {
+    // These accessors are invoked from main-actor reducers; keep keychain access on MainActor.
     static let liveValue = Self(
-        hasValidAPIKey: { !APIKeyManager.shared.getAPIKey().isEmpty },
-        getAPIKey: { APIKeyManager.shared.getAPIKey() },
-        saveAPIKey: { APIKeyManager.shared.saveAPIKey($0) },
-        deleteAPIKey: { APIKeyManager.shared.deleteAPIKey() },
-        validateAPIKey: { APIKeyManager.shared.validateAPIKey($0) }
+        hasValidAPIKey: {
+            MainActor.assumeIsolated { !APIKeyManager.shared.getAPIKey().isEmpty }
+        },
+        getAPIKey: {
+            MainActor.assumeIsolated { APIKeyManager.shared.getAPIKey() }
+        },
+        saveAPIKey: { key in
+            MainActor.assumeIsolated { APIKeyManager.shared.saveAPIKey(key) }
+        },
+        deleteAPIKey: {
+            MainActor.assumeIsolated { APIKeyManager.shared.deleteAPIKey() }
+        },
+        validateAPIKey: { key in
+            MainActor.assumeIsolated { APIKeyManager.shared.validateAPIKey(key) }
+        }
     )
     
     static let testValue = Self(

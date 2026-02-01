@@ -30,7 +30,7 @@ struct EnglishWordComparatorApp: App {
         
         // Start background task processing
         Task {
-            @Dependency(\.backgroundTaskManager) var taskManager
+            let taskManager = DependencyValues._current.backgroundTaskManager
             await taskManager.startProcessingLoop()
         }
     }
@@ -47,4 +47,3 @@ struct EnglishWordComparatorApp: App {
         }
     }
 }
-

@@ -58,7 +58,7 @@ struct BackgroundTasksFeature {
         }
     }
     
-    @Dependency(\.backgroundTaskManager) var taskManager
+    private var taskManager: BackgroundTaskManagerClient { DependencyValues._current.backgroundTaskManager }
     @Dependency(\.defaultDatabase) var database
     
     var body: some Reducer<State, Action> {
@@ -137,5 +137,4 @@ struct BackgroundTasksFeature {
         }
     }
 }
-
 

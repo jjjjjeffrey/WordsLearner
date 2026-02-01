@@ -304,7 +304,7 @@ extension ComparisonHistoryListFeature.State: Equatable {
 }
 
 #if os(macOS)
-private func loadData(from url: URL) throws -> Data {
+nonisolated private func loadData(from url: URL) throws -> Data {
     let didAccess = url.startAccessingSecurityScopedResource()
     defer {
         if didAccess {
@@ -314,7 +314,7 @@ private func loadData(from url: URL) throws -> Data {
     return try Data(contentsOf: url)
 }
 
-private func decodeExportRecords(from data: Data) throws -> [ComparisonHistoryExportRecord] {
+nonisolated private func decodeExportRecords(from data: Data) throws -> [ComparisonHistoryExportRecord] {
     let decoder = JSONDecoder()
     decoder.dateDecodingStrategy = .iso8601
     return try decoder.decode([ComparisonHistoryExportRecord].self, from: data)

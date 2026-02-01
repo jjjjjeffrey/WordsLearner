@@ -10,7 +10,10 @@ import Foundation
 import SQLiteData
 
 /// Shared service for generating word comparisons
-struct ComparisonGenerationService {
+// @unchecked Sendable safety: DatabaseWriter instances used here are GRDB DatabaseQueue/Pool types
+// which serialize access internally. Follow-up: replace `any DatabaseWriter` with a Sendable
+// wrapper (or an actor) and remove @unchecked Sendable.
+nonisolated struct ComparisonGenerationService: @unchecked Sendable {
     let aiService: AIServiceClient
     let database: any DatabaseWriter
     
@@ -91,14 +94,14 @@ struct ComparisonGenerationService {
 
 // MARK: - Dependency Client
 
-struct ComparisonGenerationServiceClient {
+nonisolated struct ComparisonGenerationServiceClient: Sendable {
     var generateComparison: @Sendable (String, String, String) -> AsyncThrowingStream<String, Error>
     var saveToHistory: @Sendable (String, String, String, String) async throws -> Void
 }
 
 extension ComparisonGenerationServiceClient: DependencyKey {
     
-    static let streamString: String =
+    nonisolated static let streamString: String =
                     """
                     ## Understanding "Character" and "Characteristic"
                     
@@ -147,10 +150,12 @@ extension ComparisonGenerationServiceClient: DependencyKey {
                     Remember, **character** is about a person's nature, while **characteristic** is about the features or traits of something.
                     """
     
-    static let liveValue: Self = {
-        @Dependency(\.aiService) var aiService
-        @Dependency(\.defaultDatabase) var database
-        @Dependency(\.date.now) var now
+    @MainActor
+    static var liveValue: Self {
+        let dependencies = DependencyValues._current
+        let aiService = dependencies.aiService
+        let database = dependencies.defaultDatabase
+        let now = dependencies.date.now
         
         let service = ComparisonGenerationService(
             aiService: aiService,
@@ -175,9 +180,9 @@ extension ComparisonGenerationServiceClient: DependencyKey {
                 )
             }
         )
-    }()
+    }
     
-    static let previewValue = Self(
+    nonisolated static let previewValue = Self(
         generateComparison: { _, _, _ in
             AsyncThrowingStream { continuation in
                 Task {
@@ -201,7 +206,7 @@ extension ComparisonGenerationServiceClient: DependencyKey {
         saveToHistory: { _, _, _, _ in }
     )
     
-    static let testValue = Self(
+    nonisolated static let testValue = Self(
         generateComparison: { _, _, _ in
             AsyncThrowingStream { continuation in
                 let message = streamString
@@ -219,4 +224,3 @@ extension DependencyValues {
         set { self[ComparisonGenerationServiceClient.self] = newValue }
     }
 }
-

@@ -10,10 +10,9 @@ import Foundation
 import SQLiteData
 import OSLog
 
-private let logger = Logger(subsystem: "WordsLearner", category: "BackgroundTaskManager")
-
 /// Centralized manager for background task processing
 actor BackgroundTaskManager {
+    nonisolated private let logger = Logger(subsystem: "WordsLearner", category: "BackgroundTaskManager")
     private let database: any DatabaseWriter
     private let generator: ComparisonGenerationService
     
@@ -249,7 +248,7 @@ actor BackgroundTaskManager {
 
 // MARK: - Dependency Client
 
-struct BackgroundTaskManagerClient {
+nonisolated struct BackgroundTaskManagerClient: Sendable {
     var startProcessingLoop: @Sendable () async -> Void
     var stopProcessingLoop: @Sendable () async -> Void
     var addTask: @Sendable (String, String, String) async throws -> Void
@@ -260,9 +259,11 @@ struct BackgroundTaskManagerClient {
 }
 
 extension BackgroundTaskManagerClient: DependencyKey {
-    static let liveValue: BackgroundTaskManagerClient = {
-        @Dependency(\.defaultDatabase) var database
-        @Dependency(\.aiService) var aiService
+    @MainActor
+    static var liveValue: BackgroundTaskManagerClient {
+        let dependencies = DependencyValues._current
+        let database = dependencies.defaultDatabase
+        let aiService = dependencies.aiService
         
         let generator = ComparisonGenerationService(
             aiService: aiService,
@@ -287,7 +288,7 @@ extension BackgroundTaskManagerClient: DependencyKey {
                 try await manager.regenerateTask(taskId: taskId)
             }
         )
-    }()
+    }
     
     static let testValue = Self(
         startProcessingLoop: { },
@@ -306,6 +307,3 @@ extension DependencyValues {
         set { self[BackgroundTaskManagerClient.self] = newValue }
     }
 }
-
-
-

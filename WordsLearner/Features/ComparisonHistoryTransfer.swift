@@ -9,7 +9,7 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct ComparisonHistoryExportRecord: Codable, Identifiable, Equatable {
+nonisolated struct ComparisonHistoryExportRecord: Codable, Identifiable, Equatable {
     let id: UUID
     let word1: String
     let word2: String
@@ -41,7 +41,7 @@ struct ComparisonHistoryExportRecord: Codable, Identifiable, Equatable {
     }
 }
 
-struct ComparisonHistoryExportDocument: FileDocument, Equatable {
+nonisolated struct ComparisonHistoryExportDocument: FileDocument, Equatable {
     static var readableContentTypes: [UTType] { [.json] }
     
     var records: [ComparisonHistoryExportRecord]
