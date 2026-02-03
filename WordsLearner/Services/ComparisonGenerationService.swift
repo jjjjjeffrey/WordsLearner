@@ -150,12 +150,10 @@ extension ComparisonGenerationServiceClient: DependencyKey {
                     Remember, **character** is about a person's nature, while **characteristic** is about the features or traits of something.
                     """
     
-    @MainActor
-    static var liveValue: Self {
-        let dependencies = DependencyValues._current
-        let aiService = dependencies.aiService
-        let database = dependencies.defaultDatabase
-        let now = dependencies.date.now
+    static let liveValue: Self = {
+        @Dependency(\.aiService) var aiService
+        @Dependency(\.defaultDatabase) var database
+        @Dependency(\.date.now) var now
         
         let service = ComparisonGenerationService(
             aiService: aiService,
@@ -180,7 +178,7 @@ extension ComparisonGenerationServiceClient: DependencyKey {
                 )
             }
         )
-    }
+    }()
     
     nonisolated static let previewValue = Self(
         generateComparison: { _, _, _ in

@@ -11,7 +11,7 @@ import SQLiteData
 import SwiftUI
 
 @Reducer
-struct BackgroundTasksFeature {
+struct BackgroundTasksFeature: Sendable {
     
     @ObservableState
     struct State: Equatable {
@@ -42,7 +42,7 @@ struct BackgroundTasksFeature {
         }
     }
     
-    enum Action: Equatable {
+    enum Action: Sendable, Equatable {
         case onAppear
         case syncCurrentTaskId
         case currentTaskIdUpdated(UUID?)
@@ -58,11 +58,16 @@ struct BackgroundTasksFeature {
         }
     }
     
-    private var taskManager: BackgroundTaskManagerClient { DependencyValues._current.backgroundTaskManager }
+    @Dependency(\.backgroundTaskManager) var taskManager
     @Dependency(\.defaultDatabase) var database
+    
+    enum CancelID: Sendable {
+        case syncCurrentTaskId
+    }
     
     var body: some Reducer<State, Action> {
         Reduce { state, action in
+            
             switch action {
             case .onAppear:
                 return .run { send in
@@ -70,7 +75,7 @@ struct BackgroundTasksFeature {
                 }
                 
             case .syncCurrentTaskId:
-                return .run { send in
+                return .run { [taskManager] send in
                     // Poll for current task ID every 0.5 seconds
                     while true {
                         let currentId = await taskManager.getCurrentTaskId()
@@ -78,13 +83,14 @@ struct BackgroundTasksFeature {
                         try await Task.sleep(for: .milliseconds(500))
                     }
                 }
+                .cancellable(id: CancelID.syncCurrentTaskId)
                 
             case let .currentTaskIdUpdated(taskId):
                 state.currentGeneratingTaskId = taskId
                 return .none
                 
             case let .removeTask(taskId):
-                return .run { send in
+                return .run { [database] send in
                     await withErrorReporting {
                         try await database.write { db in
                             try BackgroundTask
@@ -96,14 +102,14 @@ struct BackgroundTasksFeature {
                 }
                 
             case let .regenerateTask(taskId):
-                return .run { send in
+                return .run { [taskManager] send in
                     await withErrorReporting {
                         try await taskManager.regenerateTask(taskId)
                     }
                 }
                 
             case .clearCompletedTasks:
-                return .run { send in
+                return .run { [database] send in
                     await withErrorReporting {
                         try await database.write { db in
                             try BackgroundTask
@@ -115,7 +121,7 @@ struct BackgroundTasksFeature {
                 }
                 
             case .clearAllTasks:
-                return .run { send in
+                return .run { [taskManager, database] send in
                     await taskManager.stopProcessingLoop()
                     
                     await withErrorReporting {
@@ -137,4 +143,3 @@ struct BackgroundTasksFeature {
         }
     }
 }
-

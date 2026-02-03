@@ -10,11 +10,9 @@ import Foundation
 import SQLiteData
 import SwiftUI
 
-@MainActor
 @Reducer
 struct WordComparatorFeature {
     
-    @MainActor
     @Reducer
     enum Path {
         @CasePathable
@@ -93,8 +91,8 @@ struct WordComparatorFeature {
         }
     }
     
-    private var apiKeyManager: APIKeyManagerClient { DependencyValues._current.apiKeyManager }
-    private var taskManager: BackgroundTaskManagerClient { DependencyValues._current.backgroundTaskManager }
+    @Dependency(\.apiKeyManager) var apiKeyManager
+    @Dependency(\.backgroundTaskManager) var taskManager
     
     var body: some Reducer<State, Action> {
         BindingReducer()
@@ -107,7 +105,9 @@ struct WordComparatorFeature {
             switch action {
             case .onAppear:
                 state.hasValidAPIKey = apiKeyManager.hasValidAPIKey()
-                return .none
+                return .run { [taskManager] _ in
+                    await taskManager.startProcessingLoop()
+                }
                 
             case .settingsButtonTapped:
                 state.settings = SettingsFeature.State()
@@ -141,7 +141,7 @@ struct WordComparatorFeature {
                 let word2 = state.word2
                 let sentence = state.sentence
                 
-                return .run { send in
+                return .run { [taskManager] send in
                     do {
                         try await taskManager.addTask(word1, word2, sentence)
                         await send(.taskAddedSuccessfully)
@@ -231,8 +231,6 @@ struct WordComparatorFeature {
     }
 }
 
-extension WordComparatorFeature.Path.State: @MainActor CaseReducerState {}
-
 extension WordComparatorFeature.Path.State: Equatable {
     static func == (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
@@ -250,3 +248,5 @@ extension WordComparatorFeature.Path.State: Equatable {
         }
     }
 }
+
+extension WordComparatorFeature.Path.State: CaseReducerState {}

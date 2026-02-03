@@ -248,22 +248,21 @@ actor BackgroundTaskManager {
 
 // MARK: - Dependency Client
 
-nonisolated struct BackgroundTaskManagerClient: Sendable {
+@DependencyClient
+struct BackgroundTaskManagerClient: Sendable {
     var startProcessingLoop: @Sendable () async -> Void
     var stopProcessingLoop: @Sendable () async -> Void
     var addTask: @Sendable (String, String, String) async throws -> Void
     var getCurrentTaskId: @Sendable () async -> UUID?
-    var isProcessing: @Sendable () async -> Bool
+    var isProcessing: @Sendable () async -> Bool = { return false }
     var getPendingTasksCount: @Sendable () async throws -> Int
     var regenerateTask: @Sendable (UUID) async throws -> Void
 }
 
 extension BackgroundTaskManagerClient: DependencyKey {
-    @MainActor
-    static var liveValue: BackgroundTaskManagerClient {
-        let dependencies = DependencyValues._current
-        let database = dependencies.defaultDatabase
-        let aiService = dependencies.aiService
+    static let liveValue: BackgroundTaskManagerClient = {
+        @Dependency(\.defaultDatabase) var database
+        @Dependency(\.aiService) var aiService
         
         let generator = ComparisonGenerationService(
             aiService: aiService,
@@ -288,7 +287,7 @@ extension BackgroundTaskManagerClient: DependencyKey {
                 try await manager.regenerateTask(taskId: taskId)
             }
         )
-    }
+    }()
     
     static let testValue = Self(
         startProcessingLoop: { },

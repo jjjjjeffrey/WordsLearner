@@ -28,11 +28,6 @@ struct EnglishWordComparatorApp: App {
             )
         }
         
-        // Start background task processing
-        Task {
-            let taskManager = DependencyValues._current.backgroundTaskManager
-            await taskManager.startProcessingLoop()
-        }
     }
     
     var body: some Scene {

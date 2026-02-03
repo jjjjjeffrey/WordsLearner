@@ -9,6 +9,7 @@ import Foundation
 import Security
 import Combine
 
+@MainActor
 class APIKeyManager: ObservableObject {
     @Published var hasValidAPIKey: Bool = false
     
@@ -90,4 +91,3 @@ class APIKeyManager: ObservableObject {
                !key.contains(" ") // API keys typically don't have spaces
     }
 }
-

@@ -36,6 +36,8 @@ struct ResponseDetailFeature {
         case comparisonSaveFailed(String)
     }
     
+    @Dependency(\.comparisonGenerator) var generator
+    
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
@@ -55,11 +57,8 @@ struct ResponseDetailFeature {
                 state.isStreaming = true
                 state.errorMessage = nil
                 
-                return .run { [word1 = state.word1, word2 = state.word2, sentence = state.sentence] send in
+                return .run { [generator, word1 = state.word1, word2 = state.word2, sentence = state.sentence] send in
                     do {
-                        let generator = await MainActor.run {
-                            DependencyValues._current.comparisonGenerator
-                        }
                         for try await chunk in generator.generateComparison(word1, word2, sentence) {
                             await send(.streamChunkReceived(chunk))
                         }
@@ -81,11 +80,8 @@ struct ResponseDetailFeature {
                 return .none
             case .streamCompleted:
                 state.isStreaming = false
-                return .run { [word1 = state.word1, word2 = state.word2, sentence = state.sentence, response = state.streamingResponse] send in
+                return .run { [generator, word1 = state.word1, word2 = state.word2, sentence = state.sentence, response = state.streamingResponse] send in
                     do {
-                        let generator = await MainActor.run {
-                            DependencyValues._current.comparisonGenerator
-                        }
                         try await generator.saveToHistory(
                             word1,
                             word2,

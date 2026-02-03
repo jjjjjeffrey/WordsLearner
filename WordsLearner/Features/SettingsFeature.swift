@@ -35,8 +35,7 @@ struct SettingsFeature {
         }
     }
     
-    private var apiKeyManager: APIKeyManagerClient { DependencyValues._current.apiKeyManager }
-    @Dependency(\.dismiss) var dismiss
+    @Dependency(\.apiKeyManager) var apiKeyManager
     
     var body: some Reducer<State, Action> {
         BindingReducer()
