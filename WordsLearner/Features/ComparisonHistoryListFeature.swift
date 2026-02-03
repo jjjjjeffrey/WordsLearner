@@ -31,11 +31,11 @@ struct ComparisonHistoryListFeature {
         
         @Presents var alert: AlertState<Action.Alert>?
         
-        #if os(macOS)
+#if os(macOS)
         var isExporting = false
         var isImporting = false
         var exportDocument: ComparisonHistoryExportDocument?
-        #endif
+#endif
     }
     
     enum Action: Equatable {
@@ -46,7 +46,7 @@ struct ComparisonHistoryListFeature {
         case filterToggled
         case alert(PresentationAction<Alert>)
         case delegate(Delegate)
-        #if os(macOS)
+#if os(macOS)
         case exportButtonTapped
         case exportPrepared(ComparisonHistoryExportDocument)
         case exportFailed(String)
@@ -57,7 +57,7 @@ struct ComparisonHistoryListFeature {
         case importFilePicked([URL])
         case importCompleted(Int)
         case importFailed(String)
-        #endif
+#endif
         
         enum Alert: Equatable {
             case clearAllConfirmed
@@ -70,21 +70,24 @@ struct ComparisonHistoryListFeature {
     
     @Dependency(\.defaultDatabase) var database
     
+    enum CancelID {
+        case comparisonTapped
+    }
+    
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
             case let .comparisonTapped(comparison):
                 return .run { send in
-                    await withErrorReporting {
-                        try await database.write { db in
-                            try ComparisonHistory
-                                .where { $0.id == comparison.id }
-                                .update { $0.isRead = true }
-                                .execute(db)
-                        }
+                    try await database.write { db in
+                        try ComparisonHistory
+                            .where { $0.id == comparison.id }
+                            .update { $0.isRead = true }
+                            .execute(db)
                     }
                     await send(.delegate(.comparisonSelected(comparison)))
                 }
+                .cancellable(id: CancelID.comparisonTapped)
             case let .deleteComparisons(indexSet):
                 let comparisons = state.filteredComparisons
                 return .run { send in
@@ -134,7 +137,7 @@ struct ComparisonHistoryListFeature {
             case .alert:
                 return .none
                 
-            #if os(macOS)
+#if os(macOS)
             case .exportButtonTapped:
                 return .run { send in
                     do {
@@ -247,7 +250,7 @@ struct ComparisonHistoryListFeature {
                     TextState("Unable to import comparison history. \(message)")
                 }
                 return .none
-            #endif
+#endif
             }
         }
         .ifLet(\.$alert, action: \.alert)
@@ -278,7 +281,7 @@ struct ComparisonHistoryListFeature {
                     )
                 }
             }
-    }
+        }
 }
 
 // Separate Equatable conformance to work around @Fetch property wrapper limitation

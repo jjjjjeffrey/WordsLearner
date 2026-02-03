@@ -159,12 +159,11 @@ struct BackgroundTasksFeatureTests {
         )
         
         let task = await store.send(.syncCurrentTaskId)
+        await task.cancel()
         await store.receive(.currentTaskIdUpdated(id)) {
             $0.currentGeneratingTaskId = id
         }
-        
-        // Cancel while the effect is sleeping to stop the infinite loop.
-        await task.cancel()
+        await store.finish()
     }
     
     // MARK: - removeTask Action Tests

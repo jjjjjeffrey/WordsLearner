@@ -57,7 +57,23 @@ func createAppDatabase(
     }
     #endif // DEBUG
     
-    let database = try SQLiteData.defaultDatabase(configuration: configuration)
+    let database: any DatabaseWriter
+    if context != .live && useTest {
+        let temporaryRoot = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let databaseDirectory = temporaryRoot.appendingPathComponent(
+            "WordsLearnerTests-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: databaseDirectory,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+        let databasePath = databaseDirectory.appendingPathComponent("WordsLearner.sqlite").path
+        database = try SQLiteData.defaultDatabase(path: databasePath, configuration: configuration)
+    } else {
+        database = try SQLiteData.defaultDatabase(configuration: configuration)
+    }
     
     var migrator = DatabaseMigrator()
     

@@ -79,6 +79,7 @@ struct ResponseDetailViewTests {
             try? await Task.sleep(nanoseconds: 50_000_000)
         }
 
+        try? await Task.sleep(nanoseconds: 50_000_000)
         let view = NavigationStack {
             ResponseDetailView(store: store)
         }

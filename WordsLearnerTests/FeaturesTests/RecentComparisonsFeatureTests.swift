@@ -205,8 +205,8 @@ struct RecentComparisonsFeatureTests {
         let tapped = store.state.recentComparisons[0]
         #expect(tapped.isRead == false)
         await store.send(.comparisonTapped(tapped))
-        await store.finish()
         await store.receive(.delegate(.comparisonSelected(tapped)))
+        await store.finish()
         #expect(store.state.recentComparisons[0].isRead == true)
         #expect(store.state.recentComparisons[1].isRead == false)
     }

@@ -43,6 +43,10 @@ struct RecentComparisonsFeature {
     
     @Dependency(\.defaultDatabase) var database
     
+    enum CancelID {
+        case comparisonTapped
+    }
+    
     var body: some Reducer<State, Action> {
         BindingReducer()
         
@@ -53,16 +57,15 @@ struct RecentComparisonsFeature {
                 
             case let .comparisonTapped(comparison):
                 return .run { send in
-                    await withErrorReporting {
-                        try await database.write { db in
-                            try ComparisonHistory
-                                .where { $0.id == comparison.id }
-                                .update { $0.isRead = true }
-                                .execute(db)
-                        }
+                    try await database.write { db in
+                        try ComparisonHistory
+                            .where { $0.id == comparison.id }
+                            .update { $0.isRead = true }
+                            .execute(db)
                     }
                     await send(.delegate(.comparisonSelected(comparison)))
                 }
+                .cancellable(id: CancelID.comparisonTapped)
             case let .deleteComparisons(indexSet):
                 return .run { [comparisons = state.recentComparisons] send in
                     await withErrorReporting {

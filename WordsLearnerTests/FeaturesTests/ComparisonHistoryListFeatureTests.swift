@@ -189,9 +189,8 @@ struct ComparisonHistoryListFeatureTests {
         #expect(tapped.isRead == false)
         
         await store.send(.comparisonTapped(tapped))
-        await store.finish()
         await store.receive(.delegate(.comparisonSelected(tapped)))
-        
+        await store.finish()
         let updated = try #require(store.state.filteredComparisons.first(where: { $0.id == tapped.id }))
         #expect(updated.isRead == true)
     }
