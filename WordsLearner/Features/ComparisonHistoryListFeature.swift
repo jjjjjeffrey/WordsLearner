@@ -118,6 +118,7 @@ struct ComparisonHistoryListFeature {
                 return .none
                 
             case .alert(.presented(.clearAllConfirmed)):
+                state.alert = nil
                 return .run { send in
                     await withErrorReporting {
                         try await database.write { db in

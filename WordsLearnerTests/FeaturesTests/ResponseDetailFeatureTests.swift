@@ -400,6 +400,8 @@ struct ResponseDetailFeatureTests {
     
     @Test
     func testShareButtonTapped() async {
+        var capturedShareText: String?
+        
         let store = TestStore(initialState: ResponseDetailFeature.State(
             word1: "character",
             word2: "characteristic",
@@ -407,12 +409,16 @@ struct ResponseDetailFeatureTests {
             streamingResponse: "This is the analysis response"
         )) {
             ResponseDetailFeature()
+        } withDependencies: {
+            $0.platformShare.share = { text in
+                capturedShareText = text
+            }
         }
         
         await store.send(.shareButtonTapped)
-        
-        // Verify the action is handled (PlatformShareService.share is called)
-        // Since it's a static method, we can't easily verify the exact text,
-        // but we can verify the action completes without errors
+
+        #expect(capturedShareText?.contains("Word Comparison: character vs characteristic") == true)
+        #expect(capturedShareText?.contains("Context: This is a test sentence") == true)
+        #expect(capturedShareText?.contains("This is the analysis response") == true)
     }
 }

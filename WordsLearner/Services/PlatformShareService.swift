@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import ComposableArchitecture
+import Foundation
 
 #if os(iOS)
 import UIKit
@@ -72,6 +74,35 @@ struct PlatformShareService {
         NSUserNotificationCenter.default.deliver(notification)
     }
     #endif
+}
+
+struct PlatformShareClient: Sendable {
+    var share: @Sendable (String) -> Void
+}
+
+extension PlatformShareClient: DependencyKey {
+    static let liveValue = Self(
+        share: { text in
+            if Thread.isMainThread {
+                PlatformShareService.share(text: text)
+            } else {
+                DispatchQueue.main.async {
+                    PlatformShareService.share(text: text)
+                }
+            }
+        }
+    )
+    
+    static let testValue = Self(
+        share: { _ in }
+    )
+}
+
+extension DependencyValues {
+    var platformShare: PlatformShareClient {
+        get { self[PlatformShareClient.self] }
+        set { self[PlatformShareClient.self] = newValue }
+    }
 }
 
 // SwiftUI View Modifier for easy sharing

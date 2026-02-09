@@ -37,6 +37,7 @@ struct ResponseDetailFeature {
     }
     
     @Dependency(\.comparisonGenerator) var generator
+    @Dependency(\.platformShare) var platformShare
     
     var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -116,7 +117,7 @@ struct ResponseDetailFeature {
                 \(state.streamingResponse)
                 """
                 
-                PlatformShareService.share(text: shareText)
+                platformShare.share(shareText)
                 return .none
             }
         }

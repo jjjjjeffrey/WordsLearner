@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Xcode
+DerivedData/
+DerivedData*/
+*.xcuserdatad/
+*.xcuserdata/
+**/xcuserdata/
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+# SwiftPM
+.build/
+.swiftpm/
+
+# Tuist
+Derived/
+Tuist/.build/
+Tuist/Dependencies/
+
+# Generated workspaces
+*.xcworkspace/
+*.xcodeproj/
