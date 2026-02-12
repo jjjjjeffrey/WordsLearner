@@ -12,30 +12,34 @@ import SwiftUI
 
 @Reducer
 struct WordComparatorFeature {
-    
-    @Reducer
-    enum Path {
-        @CasePathable
-        @dynamicMemberLookup
-        @ObservableState
-        enum State {
-            typealias StateReducer = Path
-            
-            case detail(ResponseDetailFeature.State)
-            case historyList(ComparisonHistoryListFeature.State)
-            case backgroundTasks(BackgroundTasksFeature.State)
+    enum SidebarItem: String, CaseIterable, Equatable, Hashable, Identifiable {
+        case composer
+        case history
+        case backgroundTasks
+
+        var id: Self { self }
+
+        var title: String {
+            switch self {
+            case .composer:
+                return "Comparator"
+            case .history:
+                return "History"
+            case .backgroundTasks:
+                return "Background Tasks"
+            }
         }
-        
-        @CasePathable
-        enum Action {
-            case detail(ResponseDetailFeature.Action)
-            case historyList(ComparisonHistoryListFeature.Action)
-            case backgroundTasks(BackgroundTasksFeature.Action)
+
+        var systemImage: String {
+            switch self {
+            case .composer:
+                return "text.book.closed"
+            case .history:
+                return "clock"
+            case .backgroundTasks:
+                return "line.3.horizontal.decrease.circle"
+            }
         }
-        
-        case detail(ResponseDetailFeature)
-        case historyList(ComparisonHistoryListFeature)
-        case backgroundTasks(BackgroundTasksFeature)
     }
 
     @ObservableState
@@ -54,9 +58,13 @@ struct WordComparatorFeature {
         )
         var pendingTasks: [BackgroundTask] = []
         
+        var sidebarSelection: SidebarItem? = .composer
         var recentComparisons = RecentComparisonsFeature.State()
-        
-        var path = StackState<Path.State>()
+        var historyList: ComparisonHistoryListFeature.State?
+        var backgroundTasks: BackgroundTasksFeature.State?
+        var detail: ResponseDetailFeature.State?
+        var detailPresentationToken: Int = 0
+
         @Presents var settings: SettingsFeature.State?
         @Presents var alert: AlertState<Action.Alert>?
         
@@ -79,9 +87,12 @@ struct WordComparatorFeature {
         case settingsButtonTapped
         case historyListButtonTapped
         case backgroundTasksButtonTapped
-        case path(StackActionOf<Path>)
         case settings(PresentationAction<SettingsFeature.Action>)
         case recentComparisons(RecentComparisonsFeature.Action)
+        case historyList(ComparisonHistoryListFeature.Action)
+        case backgroundTasks(BackgroundTasksFeature.Action)
+        case detail(ResponseDetailFeature.Action)
+        case detailDismissed
         case alert(PresentationAction<Alert>)
         case clearInputFields
         case taskAddedSuccessfully
@@ -105,6 +116,7 @@ struct WordComparatorFeature {
             switch action {
             case .onAppear:
                 state.hasValidAPIKey = apiKeyManager.hasValidAPIKey()
+                activateSelection(&state)
                 return .run { [taskManager] _ in
                     await taskManager.startProcessingLoop()
                 }
@@ -114,7 +126,8 @@ struct WordComparatorFeature {
                 return .none
                 
             case .backgroundTasksButtonTapped:
-                state.path.append(.backgroundTasks(BackgroundTasksFeature.State()))
+                state.sidebarSelection = .backgroundTasks
+                activateSelection(&state)
                 return .none
                 
             case .generateButtonTapped:
@@ -124,15 +137,21 @@ struct WordComparatorFeature {
                 let word2 = state.word2
                 let sentence = state.sentence
                 
-                state.path.append(.detail(
+                state.sidebarSelection = .composer
+                activateSelection(&state)
+                showDetail(
+                    &state,
                     ResponseDetailFeature.State(
-                        word1: word1,
-                        word2: word2,
-                        sentence: sentence
+                    word1: word1,
+                    word2: word2,
+                    sentence: sentence
                     )
-                ))
-                
-                return .send(.clearInputFields)
+                )
+
+                return .concatenate(
+                    .send(.clearInputFields),
+                    .send(.detail(.startStreaming))
+                )
                 
             case .generateInBackgroundButtonTapped:
                 guard state.canGenerate && state.hasValidAPIKey else { return .none }
@@ -161,7 +180,8 @@ struct WordComparatorFeature {
                 return .none
                 
             case .historyListButtonTapped:
-                state.path.append(.historyList(ComparisonHistoryListFeature.State()))
+                state.sidebarSelection = .history
+                activateSelection(&state)
                 return .none
                 
             case .settings(.presented(.delegate(.apiKeyChanged))):
@@ -169,48 +189,64 @@ struct WordComparatorFeature {
                 return .none
                 
             case let .recentComparisons(.delegate(.comparisonSelected(comparison))):
-                state.path.append(.detail(
+                state.sidebarSelection = .composer
+                activateSelection(&state)
+                showDetail(
+                    &state,
                     ResponseDetailFeature.State(
-                        word1: comparison.word1,
-                        word2: comparison.word2,
-                        sentence: comparison.sentence,
-                        streamingResponse: comparison.response,
-                        shouldStartStreaming: false
+                    word1: comparison.word1,
+                    word2: comparison.word2,
+                    sentence: comparison.sentence,
+                    streamingResponse: comparison.response,
+                    shouldStartStreaming: false
                     )
-                ))
+                )
+                return .send(.detail(.hydrateStoredResponse))
+
+            case let .historyList(.delegate(.comparisonSelected(comparison))):
+                showDetail(
+                    &state,
+                    ResponseDetailFeature.State(
+                    word1: comparison.word1,
+                    word2: comparison.word2,
+                    sentence: comparison.sentence,
+                    streamingResponse: comparison.response,
+                    shouldStartStreaming: false
+                    )
+                )
+                return .send(.detail(.hydrateStoredResponse))
+
+            case let .backgroundTasks(.delegate(.comparisonSelected(comparison))):
+                showDetail(
+                    &state,
+                    ResponseDetailFeature.State(
+                    word1: comparison.word1,
+                    word2: comparison.word2,
+                    sentence: comparison.sentence,
+                    streamingResponse: comparison.response,
+                    shouldStartStreaming: false
+                    )
+                )
+                return .send(.detail(.hydrateStoredResponse))
+
+            case .binding(\.sidebarSelection):
+                activateSelection(&state)
+                return .none
+
+            case .recentComparisons:
                 return .none
                 
-            case let .path(action):
-                switch action {
-                case .element(id: _, action: .historyList(.delegate(.comparisonSelected(let comparison)))):
-                    state.path.append(.detail(
-                        ResponseDetailFeature.State(
-                            word1: comparison.word1,
-                            word2: comparison.word2,
-                            sentence: comparison.sentence,
-                            streamingResponse: comparison.response,
-                            shouldStartStreaming: false
-                        )
-                    ))
-                    return .none
-                    
-                case .element(id: _, action: .backgroundTasks(.delegate(.comparisonSelected(let comparison)))):
-                    state.path.append(.detail(
-                        ResponseDetailFeature.State(
-                            word1: comparison.word1,
-                            word2: comparison.word2,
-                            sentence: comparison.sentence,
-                            streamingResponse: comparison.response,
-                            shouldStartStreaming: false
-                        )
-                    ))
-                    return .none
-                    
-                default:
-                    return .none
-                }
+            case .historyList:
+                return .none
                 
-            case .recentComparisons:
+            case .backgroundTasks:
+                return .none
+
+            case .detail:
+                return .none
+
+            case .detailDismissed:
+                state.detail = nil
                 return .none
                 
             case .settings:
@@ -223,30 +259,55 @@ struct WordComparatorFeature {
                 return .none
             }
         }
-        .forEach(\.path, action: \.path)
+        .ifLet(\.historyList, action: \.historyList) {
+            ComparisonHistoryListFeature()
+        }
+        .ifLet(\.backgroundTasks, action: \.backgroundTasks) {
+            BackgroundTasksFeature()
+        }
+        .ifLet(\.detail, action: \.detail) {
+            ResponseDetailFeature()
+        }
         .ifLet(\.$settings, action: \.settings) {
             SettingsFeature()
         }
         .ifLet(\.$alert, action: \.alert)
     }
-}
 
-extension WordComparatorFeature.Path.State: Equatable {
-    static func == (lhs: Self, rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case (.detail(let lhsState), .detail(let rhsState)):
-            return lhsState == rhsState
-        case (.historyList(let lhsState), .historyList(let rhsState)):
-            // Compare only equatable properties, ignoring @Fetch
-            return lhsState.searchText == rhsState.searchText &&
-                   lhsState.showUnreadOnly == rhsState.showUnreadOnly &&
-                   lhsState.alert == rhsState.alert
-        case (.backgroundTasks(let lhsState), .backgroundTasks(let rhsState)):
-            return lhsState == rhsState
-        default:
-            return false
+    private func activateSelection(_ state: inout State) {
+        guard let selection = state.sidebarSelection else {
+            state.sidebarSelection = .composer
+            state.historyList = nil
+            state.backgroundTasks = nil
+            state.detail = nil
+            return
+        }
+
+        switch selection {
+        case .composer:
+            state.historyList = nil
+            state.backgroundTasks = nil
+
+        case .history:
+            if state.historyList == nil {
+                state.historyList = ComparisonHistoryListFeature.State()
+            }
+            state.backgroundTasks = nil
+
+        case .backgroundTasks:
+            if state.backgroundTasks == nil {
+                state.backgroundTasks = BackgroundTasksFeature.State()
+            }
+            state.historyList = nil
+        }
+
+        if selection != .composer {
+            state.detail = nil
         }
     }
-}
 
-extension WordComparatorFeature.Path.State: CaseReducerState {}
+    private func showDetail(_ state: inout State, _ detail: ResponseDetailFeature.State) {
+        state.detail = detail
+        state.detailPresentationToken &+= 1
+    }
+}

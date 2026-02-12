@@ -26,6 +26,7 @@ struct ResponseDetailFeature {
     
     enum Action: Equatable {
         case onAppear
+        case hydrateStoredResponse
         case startStreaming
         case streamChunkReceived(String)
         case streamCompleted
@@ -43,19 +44,27 @@ struct ResponseDetailFeature {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                guard state.shouldStartStreaming else {
-                    if state.streamingResponse.isEmpty {
-                        return .none
-                    }
-                    return .run { [ streamingResponse = state.streamingResponse ] send in
-                        let processed = await AttributedStringRenderer.renderMarkdown(streamingResponse)
-                        await send(.attributedStringRendered(processed))
-                    }
+                if state.shouldStartStreaming, !state.isStreaming, state.streamingResponse.isEmpty {
+                    return .send(.startStreaming)
                 }
-                return .send(.startStreaming)
+                if !state.streamingResponse.isEmpty, state.attributedString.characters.isEmpty {
+                    return .send(.hydrateStoredResponse)
+                }
+                return .none
+
+            case .hydrateStoredResponse:
+                guard !state.streamingResponse.isEmpty else {
+                    return .none
+                }
+                return .run { [ streamingResponse = state.streamingResponse ] send in
+                    let processed = await AttributedStringRenderer.renderMarkdown(streamingResponse)
+                    await send(.attributedStringRendered(processed))
+                }
                 
             case .startStreaming:
+                guard !state.isStreaming else { return .none }
                 state.isStreaming = true
+                state.shouldStartStreaming = false
                 state.errorMessage = nil
                 
                 return .run { [generator, word1 = state.word1, word2 = state.word2, sentence = state.sentence] send in

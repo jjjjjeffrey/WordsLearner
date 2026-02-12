@@ -41,6 +41,7 @@ struct ResponseDetailFeatureTests {
         await store.receive(.startStreaming) {
             $0.isStreaming = true
             $0.errorMessage = nil
+            $0.shouldStartStreaming = false
         }
         
         // Send first chunk
@@ -80,7 +81,6 @@ struct ResponseDetailFeatureTests {
         }
         
         await store.send(.onAppear)
-        // Should not send any action when shouldStartStreaming is false
     }
     
     @Test
@@ -96,6 +96,7 @@ struct ResponseDetailFeatureTests {
         }
         
         await store.send(.onAppear)
+        await store.receive(.hydrateStoredResponse)
         let rendered = await AttributedStringRenderer.renderMarkdown("This is a streamingResponse")
         await store.receive(.attributedStringRendered(rendered)) {
             $0.attributedString = rendered
@@ -126,6 +127,7 @@ struct ResponseDetailFeatureTests {
         await store.send(.startStreaming) {
             $0.isStreaming = true
             $0.errorMessage = nil
+            $0.shouldStartStreaming = false
         }
         
         // Send first chunk
@@ -254,6 +256,7 @@ struct ResponseDetailFeatureTests {
         await store.send(.startStreaming) {
             $0.isStreaming = true
             $0.errorMessage = nil
+            $0.shouldStartStreaming = false
         }
         
         // Send an error
@@ -295,6 +298,7 @@ struct ResponseDetailFeatureTests {
         await store.send(.startStreaming) {
             $0.isStreaming = true
             $0.errorMessage = nil
+            $0.shouldStartStreaming = false
         }
         
         // Send a chunk
@@ -355,6 +359,7 @@ struct ResponseDetailFeatureTests {
         await store.send(.startStreaming) {
             $0.isStreaming = true
             $0.errorMessage = nil
+            $0.shouldStartStreaming = false
         }
         
         // Send chunks

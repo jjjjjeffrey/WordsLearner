@@ -11,65 +11,15 @@ import SQLiteData
 
 struct WordComparatorMainView: View {
     @Bindable var store: StoreOf<WordComparatorFeature>
+    #if os(iOS)
+    @State private var splitVisibility: NavigationSplitViewVisibility = .automatic
+    @State private var preferredCompactColumn: NavigationSplitViewColumn = .content
+    #endif
     
     var body: some View {
-        NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
-            ScrollView {
-                VStack(spacing: 20) {
-                    headerView
-                    
-                    if !store.hasValidAPIKey {
-                        apiKeyWarningView
-                    }
-                    
-                    inputFieldsView
-                    generateButtonsView
-                    
-                    RecentComparisonsView(
-                        store: store.scope(
-                            state: \.recentComparisons,
-                            action: \.recentComparisons
-                        )
-                    )
-                }
-                .padding()
-            }
-            .background(AppColors.background)
-            .navigationTitle("Word Comparator")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.large)
-            #endif
-            .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
-                        backgroundTasksButton
-                        historyButton
-                        settingsButton
-                    }
-                }
-                #else
-                ToolbarItem(placement: .primaryAction) {
-                    HStack(spacing: 12) {
-                        backgroundTasksButton
-                        historyButton
-                        settingsButton
-                    }
-                }
-                #endif
-            }
-            .onAppear {
-                store.send(.onAppear)
-            }
-        } destination: { store in
-            switch store.case {
-            case let .detail(detailStore):
-                ResponseDetailView(store: detailStore)
-            case let .historyList(historyStore):
-                ComparisonHistoryListView(store: historyStore)
-            case let .backgroundTasks(backgroundTasksStore):
-                BackgroundTasksView(store: backgroundTasksStore)
-            }
+        splitView
+        .onAppear {
+            store.send(.onAppear)
         }
         .sheet(
             item: $store.scope(state: \.settings, action: \.settings)
@@ -78,40 +28,152 @@ struct WordComparatorMainView: View {
         }
         .alert($store.scope(state: \.alert, action: \.alert))
     }
-    
-    // MARK: - Toolbar Buttons
-    
-    private var backgroundTasksButton: some View {
-        Button {
-            store.send(.backgroundTasksButtonTapped)
-        } label: {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: "line.3.horizontal.decrease.circle")
-                    .foregroundColor(.primary)
-                
-                // Badge for pending tasks count
-                if store.pendingTasksCount > 0 {
-                    Text("\(store.pendingTasksCount)")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .padding(4)
-                        .background(Circle().fill(AppColors.error))
-                        .offset(x: 8, y: -8)
+
+    private var splitView: some View {
+        Group {
+            #if os(iOS)
+            NavigationSplitView(
+                columnVisibility: $splitVisibility,
+                preferredCompactColumn: $preferredCompactColumn
+            ) {
+                sidebarView
+            } content: {
+                contentColumn
+            } detail: {
+                detailColumn
+            }
+            #else
+            NavigationSplitView {
+                sidebarView
+            } content: {
+                contentColumn
+            } detail: {
+                detailColumn
+            }
+            #endif
+        }
+        .navigationSplitViewStyle(.balanced)
+        .onChange(of: store.detailPresentationToken) { _, _ in
+            #if os(iOS)
+            guard horizontalSizeClass == .compact else { return }
+            preferredCompactColumn = store.detail == nil ? .content : .detail
+            #endif
+        }
+        .onChange(of: store.sidebarSelection) { _, _ in
+            #if os(iOS)
+            guard horizontalSizeClass == .compact else { return }
+            if store.detail == nil {
+                preferredCompactColumn = .content
+            }
+            #endif
+        }
+        #if os(iOS)
+        .onChange(of: preferredCompactColumn) { _, compactColumn in
+            guard horizontalSizeClass == .compact else { return }
+            if compactColumn != .detail, store.detail != nil {
+                store.send(.detailDismissed)
+            }
+        }
+        #endif
+    }
+
+    private var sidebarView: some View {
+        List(selection: $store.sidebarSelection) {
+            ForEach(WordComparatorFeature.SidebarItem.allCases) { item in
+                NavigationLink(value: item) {
+                    HStack {
+                        Label(item.title, systemImage: item.systemImage)
+                        Spacer()
+                        if item == .backgroundTasks && store.pendingTasksCount > 0 {
+                            Text("\(store.pendingTasksCount)")
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(AppColors.secondary))
+                                .foregroundStyle(.white)
+                        }
+                    }
                 }
             }
         }
-    }
-    
-    private var historyButton: some View {
-        Button {
-            store.send(.historyListButtonTapped)
-        } label: {
-            Image(systemName: "clock")
-                .foregroundColor(.primary)
+        .navigationTitle("WordsLearner")
+        .toolbar {
+            #if os(iOS)
+            ToolbarItem(placement: .navigationBarTrailing) {
+                settingsButton
+            }
+            #else
+            ToolbarItem(placement: .primaryAction) {
+                settingsButton
+            }
+            #endif
         }
     }
-    
+
+    @ViewBuilder
+    private var contentColumn: some View {
+        switch store.sidebarSelection ?? .composer {
+        case .composer:
+            composerContent
+        case .history:
+            if let historyStore = store.scope(state: \.historyList, action: \.historyList) {
+                ComparisonHistoryListView(store: historyStore)
+            } else {
+                Text("Select History from sidebar")
+                    .foregroundStyle(.secondary)
+            }
+        case .backgroundTasks:
+            if let backgroundTasksStore = store.scope(state: \.backgroundTasks, action: \.backgroundTasks) {
+                BackgroundTasksView(store: backgroundTasksStore)
+            } else {
+                Text("Select Background Tasks from sidebar")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var detailColumn: some View {
+        if let detailStore = store.scope(state: \.detail, action: \.detail) {
+            ResponseDetailView(store: detailStore)
+        } else {
+            ContentUnavailableView(
+                "No Comparison Selected",
+                systemImage: "text.bubble",
+                description: Text("Choose a comparison to view details.")
+            )
+        }
+    }
+
+    private var composerContent: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                headerView
+
+                if !store.hasValidAPIKey {
+                    apiKeyWarningView
+                }
+
+                inputFieldsView
+                generateButtonsView
+
+                RecentComparisonsView(
+                    store: store.scope(
+                        state: \.recentComparisons,
+                        action: \.recentComparisons
+                    )
+                )
+            }
+            .padding()
+        }
+        .background(AppColors.background)
+        .navigationTitle("Word Comparator")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.large)
+        #endif
+    }
+
     private var settingsButton: some View {
         Button {
             store.send(.settingsButtonTapped)

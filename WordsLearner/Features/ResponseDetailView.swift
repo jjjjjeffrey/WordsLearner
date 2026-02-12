@@ -11,6 +11,7 @@ import SwiftUI
 struct ResponseDetailView: View {
     let store: StoreOf<ResponseDetailFeature>
     @State private var position = ScrollPosition(edge: .top)
+
     var body: some View {
         VStack(spacing: 0) {
             headerSection
@@ -194,5 +195,3 @@ struct ResponseDetailView: View {
         }
     }
 }
-
-
