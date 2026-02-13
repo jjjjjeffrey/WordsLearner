@@ -173,7 +173,11 @@ struct WordComparatorFeatureTests {
         } withDependencies: {
             $0.apiKeyManager = .testValue
             $0.comparisonGenerator = .init(
-                generateComparison: { _, _, _ in AsyncThrowingStream { _ in } },
+                generateComparison: { _, _, _ in
+                    AsyncThrowingStream { continuation in
+                        continuation.finish()
+                    }
+                },
                 saveToHistory: { @Sendable _, _, _, _ async throws in }
             )
             try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
@@ -198,8 +202,10 @@ struct WordComparatorFeatureTests {
             $0.detail?.isStreaming = true
             $0.detail?.shouldStartStreaming = false
         }
-
-        await store.skipInFlightEffects()
+        await store.receive(\.detail.streamCompleted) {
+            $0.detail?.isStreaming = false
+        }
+        await store.receive(\.detail.comparisonSaved)
     }
     
     @Test
@@ -214,7 +220,11 @@ struct WordComparatorFeatureTests {
         } withDependencies: {
             $0.apiKeyManager = .testValue
             $0.comparisonGenerator = .init(
-                generateComparison: { _, _, _ in AsyncThrowingStream { _ in } },
+                generateComparison: { _, _, _ in
+                    return AsyncThrowingStream { continuation in
+                        continuation.finish()
+                    }
+                },
                 saveToHistory: { @Sendable _, _, _, _ async throws in }
             )
             try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
@@ -237,6 +247,10 @@ struct WordComparatorFeatureTests {
             $0.detail?.isStreaming = true
             $0.detail?.shouldStartStreaming = false
         }
+        await store.receive(\.detail.streamCompleted) {
+            $0.detail?.isStreaming = false
+        }
+        await store.receive(\.detail.comparisonSaved)
 
         await store.send(\.binding.word1, "affect") {
             $0.word1 = "affect"
@@ -265,8 +279,10 @@ struct WordComparatorFeatureTests {
             $0.detail?.isStreaming = true
             $0.detail?.shouldStartStreaming = false
         }
-
-        await store.skipInFlightEffects()
+        await store.receive(\.detail.streamCompleted) {
+            $0.detail?.isStreaming = false
+        }
+        await store.receive(\.detail.comparisonSaved)
     }
 
     @Test
@@ -395,7 +411,6 @@ struct WordComparatorFeatureTests {
             $0.apiKeyManager = .testValue
             try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
         }
-        store.exhaustivity = .off
         
         await store.send(.settingsButtonTapped) {
             $0.settings = SettingsFeature.State()
@@ -425,7 +440,7 @@ struct WordComparatorFeatureTests {
             $0.apiKeyManager = .testValue
             try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
         }
-        store.exhaustivity = .off
+        let rendered = await AttributedStringRenderer.renderMarkdown("Response text")
         
         await store.send(.recentComparisons(.delegate(.comparisonSelected(comparison)))) {
             $0.detail = ResponseDetailFeature.State(
@@ -436,6 +451,10 @@ struct WordComparatorFeatureTests {
                 shouldStartStreaming: false
             )
             $0.detailPresentationToken = 1
+        }
+        await store.receive(\.detail.hydrateStoredResponse)
+        await store.receive(\.detail.attributedStringRendered) {
+            $0.detail?.attributedString = rendered
         }
     }
     
@@ -457,7 +476,7 @@ struct WordComparatorFeatureTests {
             $0.apiKeyManager = .testValue
             try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
         }
-        store.exhaustivity = .off
+        let rendered = await AttributedStringRenderer.renderMarkdown("Response text")
         
         await store.send(.historyListButtonTapped) {
             $0.sidebarSelection = .history
@@ -473,6 +492,10 @@ struct WordComparatorFeatureTests {
                 shouldStartStreaming: false
             )
             $0.detailPresentationToken = 1
+        }
+        await store.receive(\.detail.hydrateStoredResponse)
+        await store.receive(\.detail.attributedStringRendered) {
+            $0.detail?.attributedString = rendered
         }
     }
     
@@ -495,7 +518,7 @@ struct WordComparatorFeatureTests {
             $0.apiKeyManager = .testValue
             try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
         }
-        store.exhaustivity = .off
+        let rendered = await AttributedStringRenderer.renderMarkdown("Response text")
         await store.send(.backgroundTasksButtonTapped) {
             $0.sidebarSelection = .backgroundTasks
             $0.backgroundTasks = BackgroundTasksFeature.State()
@@ -510,6 +533,10 @@ struct WordComparatorFeatureTests {
                 shouldStartStreaming: false
             )
             $0.detailPresentationToken = 1
+        }
+        await store.receive(\.detail.hydrateStoredResponse)
+        await store.receive(\.detail.attributedStringRendered) {
+            $0.detail?.attributedString = rendered
         }
     }
 
@@ -540,7 +567,8 @@ struct WordComparatorFeatureTests {
             $0.apiKeyManager = .testValue
             try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
         }
-        store.exhaustivity = .off
+        let firstRendered = await AttributedStringRenderer.renderMarkdown(first.response)
+        let secondRendered = await AttributedStringRenderer.renderMarkdown(second.response)
 
         await store.send(.historyListButtonTapped) {
             $0.sidebarSelection = .history
@@ -557,6 +585,10 @@ struct WordComparatorFeatureTests {
             )
             $0.detailPresentationToken = 1
         }
+        await store.receive(\.detail.hydrateStoredResponse)
+        await store.receive(\.detail.attributedStringRendered) {
+            $0.detail?.attributedString = firstRendered
+        }
 
         await store.send(.detailDismissed) {
             $0.detail = nil
@@ -571,6 +603,10 @@ struct WordComparatorFeatureTests {
                 shouldStartStreaming: false
             )
             $0.detailPresentationToken = 2
+        }
+        await store.receive(\.detail.hydrateStoredResponse)
+        await store.receive(\.detail.attributedStringRendered) {
+            $0.detail?.attributedString = secondRendered
         }
     }
     

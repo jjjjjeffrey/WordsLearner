@@ -102,9 +102,9 @@ struct BackgroundTasksFeatureTests {
         #expect(store.state.pendingTasksCount == 1)
         #expect(store.state.completedTasksCount == 2)  // completed + failed
     }
-    
+
     // MARK: - onAppear Action Tests
-    
+
     @Test
     func onAppear_sendsSyncCurrentTaskId() async throws {
         let store = makeStore(
@@ -118,7 +118,7 @@ struct BackgroundTasksFeatureTests {
                 regenerateTask: { _ in }
             )
         )
-        
+
         // `syncCurrentTaskId` starts a long-living polling loop; we only want to assert it is triggered.
         store.exhaustivity = .off
         await store.send(.onAppear)
