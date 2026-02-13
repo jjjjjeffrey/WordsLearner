@@ -84,6 +84,23 @@ struct ComparisonHistoryListView: View {
                     SharedComparisonRow(comparison: comparison) {
                         store.send(.comparisonTapped(comparison))
                     }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        if comparison.isRead {
+                            Button {
+                                store.send(.markAsUnreadButtonTapped(comparison))
+                            } label: {
+                                Label("Mark Unread", systemImage: "circlebadge")
+                            }
+                            .tint(.orange)
+                        }
+                        Button(role: .destructive) {
+                            if let index = store.filteredComparisons.firstIndex(where: { $0.id == comparison.id }) {
+                                store.send(.deleteComparisons(IndexSet(integer: index)))
+                            }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                 }
@@ -111,6 +128,11 @@ struct ComparisonHistoryListView: View {
                             store.send(.comparisonTapped(comparison))
                         }
                         .contextMenu {
+                            if comparison.isRead {
+                                Button("Mark as Unread") {
+                                    store.send(.markAsUnreadButtonTapped(comparison))
+                                }
+                            }
                             Button("Delete", role: .destructive) {
                                 if let index = store.filteredComparisons.firstIndex(where: { $0.id == comparison.id }) {
                                     store.send(.deleteComparisons(IndexSet(integer: index)))

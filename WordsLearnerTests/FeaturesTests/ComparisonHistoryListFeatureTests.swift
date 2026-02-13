@@ -195,6 +195,66 @@ struct ComparisonHistoryListFeatureTests {
         #expect(updated.isRead == true)
     }
     
+    @Test
+    func markAsUnreadButtonTapped_marksUnreadInDatabase() async throws {
+        let store = makeStore()
+        
+        await store.send(.textChanged(""))
+        await store.finish()
+        
+        let readComparison = try #require(store.state.filteredComparisons.first(where: { $0.isRead }))
+        
+        await store.send(.markAsUnreadButtonTapped(readComparison))
+        await store.finish()
+        
+        let updated = try #require(store.state.filteredComparisons.first(where: { $0.id == readComparison.id }))
+        #expect(updated.isRead == false)
+    }
+    
+    @Test
+    func markAsUnreadButtonTapped_withUnreadFilter_addsItemToFilteredResults() async throws {
+        let store = makeStore()
+        
+        await store.send(.textChanged("infer")) {
+            $0.searchText = "infer"
+        }
+        await store.finish()
+        
+        let readComparison = try #require(store.state.filteredComparisons.first)
+        #expect(readComparison.isRead == true)
+        
+        await store.send(.filterToggled) {
+            $0.showUnreadOnly = true
+        }
+        await store.finish()
+        #expect(store.state.filteredComparisons.isEmpty)
+        
+        await store.send(.markAsUnreadButtonTapped(readComparison))
+        await store.finish()
+        
+        #expect(store.state.filteredComparisons.count == 1)
+        let updated = try #require(store.state.filteredComparisons.first)
+        #expect(updated.id == readComparison.id)
+        #expect(updated.isRead == false)
+    }
+    
+    @Test
+    func markAsUnreadButtonTapped_alreadyUnread_noRegression() async throws {
+        let store = makeStore()
+        
+        await store.send(.textChanged(""))
+        await store.finish()
+        
+        let unreadComparison = try #require(store.state.filteredComparisons.first(where: { !$0.isRead }))
+        
+        await store.send(.markAsUnreadButtonTapped(unreadComparison))
+        await store.finish()
+        
+        let updated = try #require(store.state.filteredComparisons.first(where: { $0.id == unreadComparison.id }))
+        #expect(updated.isRead == false)
+        #expect(store.state.allComparisons.count == 15)
+    }
+    
     // MARK: - deleteComparisons Action Tests
     
     @Test

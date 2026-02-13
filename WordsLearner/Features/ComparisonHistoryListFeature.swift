@@ -40,6 +40,7 @@ struct ComparisonHistoryListFeature {
     
     enum Action: Equatable {
         case comparisonTapped(ComparisonHistory)
+        case markAsUnreadButtonTapped(ComparisonHistory)
         case deleteComparisons(IndexSet)
         case clearAllButtonTapped
         case textChanged(String)
@@ -88,6 +89,15 @@ struct ComparisonHistoryListFeature {
                     await send(.delegate(.comparisonSelected(comparison)))
                 }
                 .cancellable(id: CancelID.comparisonTapped)
+            case let .markAsUnreadButtonTapped(comparison):
+                return .run { _ in
+                    try await database.write { db in
+                        try ComparisonHistory
+                            .where { $0.id == comparison.id }
+                            .update { $0.isRead = false }
+                            .execute(db)
+                    }
+                }
             case let .deleteComparisons(indexSet):
                 let comparisons = state.filteredComparisons
                 return .run { send in
