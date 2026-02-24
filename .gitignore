@@ -14,6 +14,7 @@ DerivedData*/
 # SwiftPM
 .build/
 .swiftpm/
+/build/
 
 # Tuist
 Derived/
