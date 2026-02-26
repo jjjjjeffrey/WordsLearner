@@ -6,9 +6,8 @@
 //
 
 import ComposableArchitecture
-import SwiftUI
 import SQLiteData
-import UniformTypeIdentifiers
+import SwiftUI
 
 struct ComparisonHistoryListView: View {
     @Bindable var store: StoreOf<ComparisonHistoryListFeature>
@@ -34,8 +33,6 @@ struct ComparisonHistoryListView: View {
             #else
             ToolbarItem(placement: .primaryAction) {
                 HStack {
-                    importButton
-                    exportButton
                     filterButton
                     clearAllButton
                 }
@@ -43,21 +40,6 @@ struct ComparisonHistoryListView: View {
             #endif
         }
         .alert($store.scope(state: \.alert, action: \.alert))
-        #if os(macOS)
-        .fileExporter(
-            isPresented: exportIsPresentedBinding,
-            document: exportDocumentValue,
-            contentType: .json,
-            defaultFilename: "comparison_history",
-            onCompletion: handleExportCompletion
-        )
-        .fileImporter(
-            isPresented: importIsPresentedBinding,
-            allowedContentTypes: [.json],
-            allowsMultipleSelection: false,
-            onCompletion: handleImportCompletion
-        )
-        #endif
     }
     
     private var listContent: some View {
@@ -206,60 +188,6 @@ struct ComparisonHistoryListView: View {
     }
     #endif
     
-    #if os(macOS)
-    private var exportIsPresentedBinding: Binding<Bool> {
-        Binding(
-            get: { store.isExporting },
-            set: { store.send(.exportPresentationChanged($0)) }
-        )
-    }
-    
-    private var importIsPresentedBinding: Binding<Bool> {
-        Binding(
-            get: { store.isImporting },
-            set: { store.send(.importPresentationChanged($0)) }
-        )
-    }
-    
-    private var exportDocumentValue: ComparisonHistoryExportDocument? {
-        store.exportDocument
-    }
-    
-    private func handleExportCompletion(_ result: Result<URL, Error>) {
-        switch result {
-        case .success:
-            store.send(.exportFinished(nil))
-        case let .failure(error):
-            store.send(.exportFinished(error.localizedDescription))
-        }
-    }
-    
-    private func handleImportCompletion(_ result: Result<[URL], Error>) {
-        switch result {
-        case let .success(urls):
-            store.send(.importFilePicked(urls))
-        case let .failure(error):
-            store.send(.importFailed(error.localizedDescription))
-        }
-    }
-    
-    private var exportButton: some View {
-        Button {
-            store.send(.exportButtonTapped)
-        } label: {
-            Label("Export", systemImage: "square.and.arrow.up")
-        }
-        .disabled(store.allComparisons.isEmpty)
-    }
-    
-    private var importButton: some View {
-        Button {
-            store.send(.importButtonTapped)
-        } label: {
-            Label("Import", systemImage: "square.and.arrow.down")
-        }
-    }
-    #endif
 }
 
 #Preview("Not empty") {

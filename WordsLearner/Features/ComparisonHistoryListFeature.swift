@@ -30,12 +30,6 @@ struct ComparisonHistoryListFeature {
         }
         
         @Presents var alert: AlertState<Action.Alert>?
-        
-#if os(macOS)
-        var isExporting = false
-        var isImporting = false
-        var exportDocument: ComparisonHistoryExportDocument?
-#endif
     }
     
     enum Action: Equatable {
@@ -47,18 +41,6 @@ struct ComparisonHistoryListFeature {
         case filterToggled
         case alert(PresentationAction<Alert>)
         case delegate(Delegate)
-#if os(macOS)
-        case exportButtonTapped
-        case exportPrepared(ComparisonHistoryExportDocument)
-        case exportFailed(String)
-        case exportPresentationChanged(Bool)
-        case exportFinished(String?)
-        case importButtonTapped
-        case importPresentationChanged(Bool)
-        case importFilePicked([URL])
-        case importCompleted(Int)
-        case importFailed(String)
-#endif
         
         enum Alert: Equatable {
             case clearAllConfirmed
@@ -147,121 +129,6 @@ struct ComparisonHistoryListFeature {
                 
             case .alert:
                 return .none
-                
-#if os(macOS)
-            case .exportButtonTapped:
-                return .run { send in
-                    do {
-                        let histories = try await database.read { db in
-                            try ComparisonHistory
-                                .order { $0.date.desc() }
-                                .fetchAll(db)
-                        }
-                        let records = histories.map(ComparisonHistoryExportRecord.init)
-                        await send(.exportPrepared(
-                            ComparisonHistoryExportDocument(records: records)
-                        ))
-                    } catch {
-                        await send(.exportFailed(error.localizedDescription))
-                    }
-                }
-                
-            case let .exportPrepared(document):
-                state.exportDocument = document
-                state.isExporting = true
-                return .none
-                
-            case let .exportFailed(message):
-                state.alert = AlertState {
-                    TextState("Export Failed")
-                } actions: {
-                    ButtonState(role: .cancel) {
-                        TextState("OK")
-                    }
-                } message: {
-                    TextState("Unable to export comparison history. \(message)")
-                }
-                return .none
-                
-            case let .exportPresentationChanged(isPresented):
-                state.isExporting = isPresented
-                if !isPresented {
-                    state.exportDocument = nil
-                }
-                return .none
-                
-            case let .exportFinished(message):
-                state.isExporting = false
-                state.exportDocument = nil
-                if let message {
-                    state.alert = AlertState {
-                        TextState("Export Failed")
-                    } actions: {
-                        ButtonState(role: .cancel) {
-                            TextState("OK")
-                        }
-                    } message: {
-                        TextState("Unable to export comparison history. \(message)")
-                    }
-                }
-                return .none
-                
-            case .importButtonTapped:
-                state.isImporting = true
-                return .none
-                
-            case let .importPresentationChanged(isPresented):
-                state.isImporting = isPresented
-                return .none
-                
-            case let .importFilePicked(urls):
-                state.isImporting = false
-                guard let url = urls.first else {
-                    return .send(.importFailed("No file selected."))
-                }
-                return .run { send in
-                    do {
-                        let data = try loadData(from: url)
-                        let records = try decodeExportRecords(from: data)
-                        try await database.write { db in
-                            try ComparisonHistory.delete().execute(db)
-                            for record in records {
-                                try ComparisonHistory.insert {
-                                    record.toDraft()
-                                }
-                                .execute(db)
-                            }
-                        }
-                        await send(.importCompleted(records.count))
-                    } catch {
-                        await send(.importFailed(error.localizedDescription))
-                    }
-                }
-                
-            case let .importCompleted(count):
-                state.alert = AlertState {
-                    TextState("Import Complete")
-                } actions: {
-                    ButtonState(role: .cancel) {
-                        TextState("OK")
-                    }
-                } message: {
-                    TextState("Imported \(count) comparison records.")
-                }
-                return .none
-                
-            case let .importFailed(message):
-                state.alert = AlertState {
-                    TextState("Import Failed")
-                } actions: {
-                    ButtonState(role: .cancel) {
-                        TextState("OK")
-                    }
-                } message: {
-                    TextState("Unable to import comparison history. \(message)")
-                }
-                return .none
-#endif
             }
         }
         .ifLet(\.$alert, action: \.alert)
@@ -309,31 +176,11 @@ extension ComparisonHistoryListFeature.State: Equatable {
     static func == (lhs: ComparisonHistoryListFeature.State, rhs: ComparisonHistoryListFeature.State) -> Bool {
         lhs.searchText == rhs.searchText &&
         lhs.showUnreadOnly == rhs.showUnreadOnly &&
-        lhs.alert == rhs.alert &&
-        lhs.isExporting == rhs.isExporting &&
-        lhs.isImporting == rhs.isImporting
+        lhs.alert == rhs.alert
         
     }
 #endif
 }
-
-#if os(macOS)
-nonisolated private func loadData(from url: URL) throws -> Data {
-    let didAccess = url.startAccessingSecurityScopedResource()
-    defer {
-        if didAccess {
-            url.stopAccessingSecurityScopedResource()
-        }
-    }
-    return try Data(contentsOf: url)
-}
-
-nonisolated private func decodeExportRecords(from data: Data) throws -> [ComparisonHistoryExportRecord] {
-    let decoder = JSONDecoder()
-    decoder.dateDecodingStrategy = .iso8601
-    return try decoder.decode([ComparisonHistoryExportRecord].self, from: data)
-}
-#endif
 
 struct ComparisonsFetchKeyRequest: FetchKeyRequest, Equatable {
     var searchText: String = ""
