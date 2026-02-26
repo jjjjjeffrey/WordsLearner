@@ -13,7 +13,6 @@ import SwiftUI
 @Reducer
 struct WordComparatorFeature {
     enum SidebarItem: String, CaseIterable, Equatable, Hashable, Identifiable {
-        case composer
         case history
         case backgroundTasks
 
@@ -21,8 +20,6 @@ struct WordComparatorFeature {
 
         var title: String {
             switch self {
-            case .composer:
-                return "Comparator"
             case .history:
                 return "History"
             case .backgroundTasks:
@@ -32,8 +29,6 @@ struct WordComparatorFeature {
 
         var systemImage: String {
             switch self {
-            case .composer:
-                return "text.book.closed"
             case .history:
                 return "clock"
             case .backgroundTasks:
@@ -58,8 +53,8 @@ struct WordComparatorFeature {
         )
         var pendingTasks: [BackgroundTask] = []
         
-        var sidebarSelection: SidebarItem? = .composer
-        var recentComparisons = RecentComparisonsFeature.State()
+        var sidebarSelection: SidebarItem? = .history
+        var isComposerSheetPresented = false
         var historyList: ComparisonHistoryListFeature.State?
         var backgroundTasks: BackgroundTasksFeature.State?
         var detail: ResponseDetailFeature.State?
@@ -82,13 +77,14 @@ struct WordComparatorFeature {
     enum Action: BindableAction {
         case binding(BindingAction<State>)
         case onAppear
+        case lastReadComparisonLoaded(ComparisonHistory?)
+        case newComparisonButtonTapped
         case generateButtonTapped
         case generateInBackgroundButtonTapped
         case settingsButtonTapped
         case historyListButtonTapped
         case backgroundTasksButtonTapped
         case settings(PresentationAction<SettingsFeature.Action>)
-        case recentComparisons(RecentComparisonsFeature.Action)
         case historyList(ComparisonHistoryListFeature.Action)
         case backgroundTasks(BackgroundTasksFeature.Action)
         case detail(ResponseDetailFeature.Action)
@@ -104,22 +100,64 @@ struct WordComparatorFeature {
     
     @Dependency(\.apiKeyManager) var apiKeyManager
     @Dependency(\.backgroundTaskManager) var taskManager
+    @Dependency(\.defaultDatabase) var database
+    @Dependency(\.lastReadComparisonStore) var lastReadComparisonStore
     
     var body: some Reducer<State, Action> {
         BindingReducer()
-        
-        Scope(state: \.recentComparisons, action: \.recentComparisons) {
-            RecentComparisonsFeature()
-        }
         
         Reduce { state, action in
             switch action {
             case .onAppear:
                 state.hasValidAPIKey = apiKeyManager.hasValidAPIKey()
                 activateSelection(&state)
-                return .run { [taskManager] _ in
-                    await taskManager.startProcessingLoop()
-                }
+                return .merge(
+                    .run { [taskManager] _ in
+                        await taskManager.startProcessingLoop()
+                    },
+                    .run { [database, lastReadComparisonStore] send in
+                        let storedID = lastReadComparisonStore.get()
+                        guard
+                            let idString = storedID,
+                            let id = UUID(uuidString: idString)
+                        else {
+                            if storedID != nil {
+                                lastReadComparisonStore.clear()
+                            }
+                            return
+                        }
+
+                        let comparison = try? await database.read { db in
+                            try ComparisonHistory
+                                .where { $0.id == id }
+                                .fetchOne(db)
+                        }
+
+                        if comparison == nil {
+                            lastReadComparisonStore.clear()
+                            return
+                        }
+                        await send(.lastReadComparisonLoaded(comparison))
+                    }
+                )
+
+            case let .lastReadComparisonLoaded(comparison):
+                guard state.sidebarSelection == .history, let comparison else { return .none }
+                showDetail(
+                    &state,
+                    ResponseDetailFeature.State(
+                        word1: comparison.word1,
+                        word2: comparison.word2,
+                        sentence: comparison.sentence,
+                        streamingResponse: comparison.response,
+                        shouldStartStreaming: false
+                    )
+                )
+                return .send(.detail(.hydrateStoredResponse))
+
+            case .newComparisonButtonTapped:
+                state.isComposerSheetPresented = true
+                return .none
                 
             case .settingsButtonTapped:
                 state.settings = SettingsFeature.State()
@@ -137,8 +175,7 @@ struct WordComparatorFeature {
                 let word2 = state.word2
                 let sentence = state.sentence
                 
-                state.sidebarSelection = .composer
-                activateSelection(&state)
+                state.isComposerSheetPresented = false
                 showDetail(
                     &state,
                     ResponseDetailFeature.State(
@@ -171,6 +208,7 @@ struct WordComparatorFeature {
                 }
                 
             case .taskAddedSuccessfully:
+                state.isComposerSheetPresented = false
                 return .none
                 
             case .clearInputFields:
@@ -188,22 +226,8 @@ struct WordComparatorFeature {
                 state.hasValidAPIKey = apiKeyManager.hasValidAPIKey()
                 return .none
                 
-            case let .recentComparisons(.delegate(.comparisonSelected(comparison))):
-                state.sidebarSelection = .composer
-                activateSelection(&state)
-                showDetail(
-                    &state,
-                    ResponseDetailFeature.State(
-                    word1: comparison.word1,
-                    word2: comparison.word2,
-                    sentence: comparison.sentence,
-                    streamingResponse: comparison.response,
-                    shouldStartStreaming: false
-                    )
-                )
-                return .send(.detail(.hydrateStoredResponse))
-
             case let .historyList(.delegate(.comparisonSelected(comparison))):
+                lastReadComparisonStore.set(comparison.id.uuidString)
                 showDetail(
                     &state,
                     ResponseDetailFeature.State(
@@ -233,9 +257,6 @@ struct WordComparatorFeature {
                 activateSelection(&state)
                 return .none
 
-            case .recentComparisons:
-                return .none
-                
             case .historyList:
                 return .none
                 
@@ -276,7 +297,7 @@ struct WordComparatorFeature {
 
     private func activateSelection(_ state: inout State) {
         guard let selection = state.sidebarSelection else {
-            state.sidebarSelection = .composer
+            state.sidebarSelection = .history
             state.historyList = nil
             state.backgroundTasks = nil
             state.detail = nil
@@ -284,10 +305,6 @@ struct WordComparatorFeature {
         }
 
         switch selection {
-        case .composer:
-            state.historyList = nil
-            state.backgroundTasks = nil
-
         case .history:
             if state.historyList == nil {
                 state.historyList = ComparisonHistoryListFeature.State()
@@ -301,7 +318,7 @@ struct WordComparatorFeature {
             state.historyList = nil
         }
 
-        if selection != .composer {
+        if selection != .history {
             state.detail = nil
         }
     }
@@ -309,5 +326,40 @@ struct WordComparatorFeature {
     private func showDetail(_ state: inout State, _ detail: ResponseDetailFeature.State) {
         state.detail = detail
         state.detailPresentationToken &+= 1
+    }
+}
+
+struct LastReadComparisonStoreClient: Sendable {
+    var get: @Sendable () -> String?
+    var set: @Sendable (String) -> Void
+    var clear: @Sendable () -> Void
+}
+
+extension LastReadComparisonStoreClient: DependencyKey {
+    private static let key = "wordComparatorLastReadComparisonID"
+
+    static let liveValue = Self(
+        get: {
+            UserDefaults.standard.string(forKey: key)
+        },
+        set: { value in
+            UserDefaults.standard.set(value, forKey: key)
+        },
+        clear: {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    )
+
+    static let testValue = Self(
+        get: { nil },
+        set: { _ in },
+        clear: {}
+    )
+}
+
+extension DependencyValues {
+    var lastReadComparisonStore: LastReadComparisonStoreClient {
+        get { self[LastReadComparisonStoreClient.self] }
+        set { self[LastReadComparisonStoreClient.self] = newValue }
     }
 }

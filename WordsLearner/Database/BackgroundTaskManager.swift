@@ -14,13 +14,13 @@ import OSLog
 actor BackgroundTaskManager {
     nonisolated private let logger = Logger(subsystem: "WordsLearner", category: "BackgroundTaskManager")
     private let database: any DatabaseWriter
-    private let generator: ComparisonGenerationService
+    private let generator: ComparisonGenerationServiceClient
     
     private var processingTask: Task<Void, Never>?
     private var isRunning = false
     private var currentTaskId: UUID?
     
-    init(database: any DatabaseWriter, generator: ComparisonGenerationService) {
+    init(database: any DatabaseWriter, generator: ComparisonGenerationServiceClient) {
         self.database = database
         self.generator = generator
     }
@@ -158,9 +158,9 @@ actor BackgroundTaskManager {
             // Generate AI response using shared service
             var fullResponse = ""
             for try await chunk in generator.generateComparison(
-                word1: task.word1,
-                word2: task.word2,
-                sentence: task.sentence
+                task.word1,
+                task.word2,
+                task.sentence
             ) {
                 fullResponse += chunk
             }
@@ -176,11 +176,10 @@ actor BackgroundTaskManager {
             
             // Save to comparison history using shared service
             try await generator.saveToHistory(
-                word1: task.word1,
-                word2: task.word2,
-                sentence: task.sentence,
-                response: fullResponse,
-                date: Date()
+                task.word1,
+                task.word2,
+                task.sentence,
+                fullResponse
             )
             
             logger.info("Task \(task.id) saved successfully")
@@ -260,15 +259,33 @@ struct BackgroundTaskManagerClient: Sendable {
 }
 
 extension BackgroundTaskManagerClient: DependencyKey {
-    static let liveValue: BackgroundTaskManagerClient = {
+    static var liveValue: BackgroundTaskManagerClient {
         @Dependency(\.defaultDatabase) var database
-        @Dependency(\.aiService) var aiService
-        
-        let generator = ComparisonGenerationService(
-            aiService: aiService,
-            database: database
+        @Dependency(\.comparisonGenerator) var comparisonGenerator
+        return make(database: database, generator: comparisonGenerator)
+    }
+
+    static var previewValue: Self {
+        @Dependency(\.defaultDatabase) var database
+        return make(database: database, generator: .previewValue)
+    }
+    
+    static var testValue: Self {
+        Self(
+            startProcessingLoop: { },
+            stopProcessingLoop: { },
+            addTask: { _, _, _ in },
+            getCurrentTaskId: { nil },
+            isProcessing: { false },
+            getPendingTasksCount: { 0 },
+            regenerateTask: { _ in }
         )
-        
+    }
+
+    private static func make(
+        database: any DatabaseWriter,
+        generator: ComparisonGenerationServiceClient
+    ) -> Self {
         let manager = BackgroundTaskManager(
             database: database,
             generator: generator
@@ -287,17 +304,7 @@ extension BackgroundTaskManagerClient: DependencyKey {
                 try await manager.regenerateTask(taskId: taskId)
             }
         )
-    }()
-    
-    static let testValue = Self(
-        startProcessingLoop: { },
-        stopProcessingLoop: { },
-        addTask: { _, _, _ in },
-        getCurrentTaskId: { nil },
-        isProcessing: { false },
-        getPendingTasksCount: { 0 },
-        regenerateTask: { _ in }
-    )
+    }
 }
 
 extension DependencyValues {

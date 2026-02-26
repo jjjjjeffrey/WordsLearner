@@ -12,6 +12,7 @@ import SQLiteData
 struct WordComparatorMainView: View {
     @Bindable var store: StoreOf<WordComparatorFeature>
     #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var splitVisibility: NavigationSplitViewVisibility = .automatic
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .content
     #endif
@@ -25,6 +26,9 @@ struct WordComparatorMainView: View {
             item: $store.scope(state: \.settings, action: \.settings)
         ) { settingsStore in
             SettingsView(store: settingsStore)
+        }
+        .sheet(isPresented: $store.isComposerSheetPresented) {
+            composerSheet
         }
         .alert($store.scope(state: \.alert, action: \.alert))
     }
@@ -53,6 +57,13 @@ struct WordComparatorMainView: View {
             #endif
         }
         .navigationSplitViewStyle(.balanced)
+        .toolbar {
+            #if os(macOS)
+            ToolbarItem(placement: .primaryAction) {
+                newComparisonButton
+            }
+            #endif
+        }
         .onChange(of: store.detailPresentationToken) { _, _ in
             #if os(iOS)
             guard horizontalSizeClass == .compact else { return }
@@ -113,12 +124,17 @@ struct WordComparatorMainView: View {
 
     @ViewBuilder
     private var contentColumn: some View {
-        switch store.sidebarSelection ?? .composer {
-        case .composer:
-            composerContent
+        switch store.sidebarSelection ?? .history {
         case .history:
             if let historyStore = store.scope(state: \.historyList, action: \.historyList) {
                 ComparisonHistoryListView(store: historyStore)
+                    #if os(iOS)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            newComparisonIconButton
+                        }
+                    }
+                    #endif
             } else {
                 Text("Select History from sidebar")
                     .foregroundStyle(.secondary)
@@ -126,6 +142,13 @@ struct WordComparatorMainView: View {
         case .backgroundTasks:
             if let backgroundTasksStore = store.scope(state: \.backgroundTasks, action: \.backgroundTasks) {
                 BackgroundTasksView(store: backgroundTasksStore)
+                    #if os(iOS)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            newComparisonIconButton
+                        }
+                    }
+                    #endif
             } else {
                 Text("Select Background Tasks from sidebar")
                     .foregroundStyle(.secondary)
@@ -133,45 +156,37 @@ struct WordComparatorMainView: View {
         }
     }
 
+    private var composerSheet: some View {
+        WordComparatorComposerSheetView(store: store) {
+            store.isComposerSheetPresented = false
+        }
+    }
+
     @ViewBuilder
     private var detailColumn: some View {
         if let detailStore = store.scope(state: \.detail, action: \.detail) {
             ResponseDetailView(store: detailStore)
+                #if os(iOS)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        newComparisonIconButton
+                    }
+                }
+                #endif
         } else {
             ContentUnavailableView(
                 "No Comparison Selected",
                 systemImage: "text.bubble",
                 description: Text("Choose a comparison to view details.")
             )
-        }
-    }
-
-    private var composerContent: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                headerView
-
-                if !store.hasValidAPIKey {
-                    apiKeyWarningView
+            #if os(iOS)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    newComparisonIconButton
                 }
-
-                inputFieldsView
-                generateButtonsView
-
-                RecentComparisonsView(
-                    store: store.scope(
-                        state: \.recentComparisons,
-                        action: \.recentComparisons
-                    )
-                )
             }
-            .padding()
+            #endif
         }
-        .background(AppColors.background)
-        .navigationTitle("Word Comparator")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.large)
-        #endif
     }
 
     private var settingsButton: some View {
@@ -182,153 +197,24 @@ struct WordComparatorMainView: View {
                 .foregroundColor(.primary)
         }
     }
-    
-    // MARK: - Content Views
-    
-    private var headerView: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "text.book.closed")
-                .font(.system(size: 40))
-                .foregroundColor(.blue)
-            
-            Text("AI English Word Comparator")
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            Text("Compare similar English words with AI assistance")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.top)
-    }
-    
-    private var apiKeyWarningView: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
-                
-                Text("API Key Required")
-                    .font(.headline)
-                    .foregroundColor(.orange)
-            }
-            
-            Text("Please configure your AIHubMix API key in settings to use this app")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-            
-            Button("Open Settings") {
-                store.send(.settingsButtonTapped)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(AppColors.warning.opacity(0.1))
-        )
-    }
-    
-    private var inputFieldsView: some View {
-        VStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Label("First Word", systemImage: "1.circle")
-                    .font(.headline)
-                
-                TextField("Enter first word (e.g., character)", text: $store.word1)
-                    .textFieldStyle(CustomTextFieldStyle())
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Second Word", systemImage: "2.circle")
-                    .font(.headline)
-                
-                TextField("Enter second word (e.g., characteristics)", text: $store.word2)
-                    .textFieldStyle(CustomTextFieldStyle())
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Context Sentence", systemImage: "text.quote")
-                    .font(.headline)
-                
-                TextField("Paste the sentence here", text: $store.sentence, axis: .vertical)
-                    .textFieldStyle(CustomTextFieldStyle())
-                    .lineLimit(3...6)
-            }
-        }
-        .padding(.horizontal, 4)
-    }
-    
-    private var generateButtonsView: some View {
-        HStack(spacing: 12) {
-            Button {
-                store.send(.generateButtonTapped)
-            } label: {
-                HStack {
-                    Image(systemName: "sparkles")
-                    Text("Generate")
-                        .fontWeight(.semibold)
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill((store.canGenerate && store.hasValidAPIKey) ? AppColors.primary : AppColors.separator)
-                )
-                .foregroundColor((store.canGenerate && store.hasValidAPIKey) ? .white : .gray)
-            }
-            .disabled(!store.canGenerate || !store.hasValidAPIKey)
-            
-            Button {
-                store.send(.generateInBackgroundButtonTapped)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.down.circle")
-                    
-                    #if os(iOS)
-                    if horizontalSizeClass == .regular {
-                        Text("Background")
-                            .fontWeight(.semibold)
-                    }
-                    #else
-                    Text("Background")
-                        .fontWeight(.semibold)
-                    #endif
-                    
-                    if store.pendingTasksCount > 0 {
-                        Text("(\(store.pendingTasksCount))")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                    }
-                }
-                .frame(minWidth: platformButtonWidth())
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill((store.canGenerate && store.hasValidAPIKey) ?
-                              AppColors.secondary : AppColors.separator)
-                )
-                .foregroundColor((store.canGenerate && store.hasValidAPIKey) ?
-                                .white : .gray)
-            }
-            .disabled(!store.canGenerate || !store.hasValidAPIKey)
+
+    private var newComparisonButton: some View {
+        Button {
+            store.send(.newComparisonButtonTapped)
+        } label: {
+            Label("New Comparison", systemImage: "plus")
         }
     }
-    
-    #if os(iOS)
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    #endif
-    
-    private func platformButtonWidth() -> CGFloat {
-        #if os(iOS)
-        return 50
-        #else
-        return 120
-        #endif
+
+    private var newComparisonIconButton: some View {
+        Button {
+            store.send(.newComparisonButtonTapped)
+        } label: {
+            Image(systemName: "plus")
+        }
+        .accessibilityLabel("New Comparison")
     }
+    
 }
 
 #if DEBUG

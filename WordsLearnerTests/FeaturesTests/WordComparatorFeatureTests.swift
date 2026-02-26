@@ -15,6 +15,23 @@ import SQLiteData
 
 @MainActor
 struct WordComparatorFeatureTests {
+    private final class LastReadStoreBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var storage: String?
+
+        func get() -> String? {
+            lock.lock()
+            defer { lock.unlock() }
+            return storage
+        }
+
+        func set(_ value: String?) {
+            lock.lock()
+            storage = value
+            lock.unlock()
+        }
+    }
+
     private let seedBaseDate = Date(timeIntervalSince1970: 1_700_000_000)
     
     private func seedBackgroundTasks(in db: Database) throws {
@@ -30,6 +47,20 @@ struct WordComparatorFeatureTests {
                 error: nil,
                 createdAt: now,
                 updatedAt: now
+            )
+        }
+    }
+
+    private func seedComparisonHistory(id: UUID, in db: Database) throws {
+        try db.seed {
+            ComparisonHistory.Draft(
+                id: id,
+                word1: "alpha",
+                word2: "beta",
+                sentence: "alpha and beta",
+                response: "Saved response",
+                date: seedBaseDate,
+                isRead: true
             )
         }
     }
@@ -106,6 +137,7 @@ struct WordComparatorFeatureTests {
         
         await store.send(.onAppear) {
             $0.hasValidAPIKey = true
+            $0.historyList = ComparisonHistoryListFeature.State()
         }
     }
     
@@ -118,7 +150,9 @@ struct WordComparatorFeatureTests {
             try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
         }
         
-        await store.send(.onAppear)
+        await store.send(.onAppear) {
+            $0.historyList = ComparisonHistoryListFeature.State()
+        }
         
         #expect(store.state.hasValidAPIKey == false)
     }
@@ -134,6 +168,88 @@ struct WordComparatorFeatureTests {
         
         await store.send(.onAppear) {
             $0.hasValidAPIKey = true
+            $0.historyList = ComparisonHistoryListFeature.State()
+        }
+    }
+
+    @Test
+    func onAppearRestoresLastReadComparisonDetail() async {
+        let id = UUID()
+        let box = LastReadStoreBox()
+        box.set(id.uuidString)
+        let store = TestStore(initialState: WordComparatorFeature.State()) {
+            WordComparatorFeature()
+        } withDependencies: {
+            $0.apiKeyManager = .testValue
+            $0.lastReadComparisonStore = .init(
+                get: { box.get() },
+                set: { box.set($0) },
+                clear: { box.set(nil) }
+            )
+            try! $0.bootstrapDatabase(useTest: true, seed: { db in
+                try seedBackgroundTasks(in: db)
+                try seedComparisonHistory(id: id, in: db)
+            })
+        }
+
+        let rendered = await AttributedStringRenderer.renderMarkdown("Saved response")
+
+        await store.send(.onAppear) {
+            $0.hasValidAPIKey = true
+            $0.historyList = ComparisonHistoryListFeature.State()
+        }
+        await store.receive(\.lastReadComparisonLoaded) {
+            $0.detail = ResponseDetailFeature.State(
+                word1: "alpha",
+                word2: "beta",
+                sentence: "alpha and beta",
+                streamingResponse: "Saved response",
+                shouldStartStreaming: false
+            )
+            $0.detailPresentationToken = 1
+        }
+        await store.receive(\.detail.hydrateStoredResponse)
+        await store.receive(\.detail.attributedStringRendered) {
+            $0.detail?.attributedString = rendered
+        }
+    }
+
+    @Test
+    func onAppearWithInvalidLastReadIdClearsPersistedValue() async {
+        let box = LastReadStoreBox()
+        box.set("not-a-uuid")
+        let store = TestStore(initialState: WordComparatorFeature.State()) {
+            WordComparatorFeature()
+        } withDependencies: {
+            $0.apiKeyManager = .testValue
+            $0.lastReadComparisonStore = .init(
+                get: { box.get() },
+                set: { box.set($0) },
+                clear: { box.set(nil) }
+            )
+            try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
+        }
+
+        await store.send(.onAppear) {
+            $0.hasValidAPIKey = true
+            $0.historyList = ComparisonHistoryListFeature.State()
+        }
+
+        #expect(box.get() == nil)
+        #expect(store.state.detail == nil)
+    }
+
+    @Test
+    func newComparisonButtonTappedPresentsComposerSheet() async {
+        let store = TestStore(initialState: WordComparatorFeature.State()) {
+            WordComparatorFeature()
+        } withDependencies: {
+            $0.apiKeyManager = .testValue
+            try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
+        }
+
+        await store.send(.newComparisonButtonTapped) {
+            $0.isComposerSheetPresented = true
         }
     }
     
@@ -167,7 +283,8 @@ struct WordComparatorFeatureTests {
             word1: "word1",
             word2: "word2",
             sentence: "This is a sentence",
-            hasValidAPIKey: true
+            hasValidAPIKey: true,
+            isComposerSheetPresented: true
         )) {
             WordComparatorFeature()
         } withDependencies: {
@@ -184,6 +301,7 @@ struct WordComparatorFeatureTests {
         }
         
         await store.send(.generateButtonTapped) {
+            $0.isComposerSheetPresented = false
             $0.detail = ResponseDetailFeature.State(
                 word1: "word1",
                 word2: "word2",
@@ -325,7 +443,8 @@ struct WordComparatorFeatureTests {
             word1: "word1",
             word2: "word2",
             sentence: "This is a sentence",
-            hasValidAPIKey: true
+            hasValidAPIKey: true,
+            isComposerSheetPresented: true
         )) {
             WordComparatorFeature()
         } withDependencies: {
@@ -335,7 +454,9 @@ struct WordComparatorFeatureTests {
         }
         
         await store.send(.generateInBackgroundButtonTapped)
-        await store.receive(\.taskAddedSuccessfully)
+        await store.receive(\.taskAddedSuccessfully) {
+            $0.isComposerSheetPresented = false
+        }
         await store.receive(\.clearInputFields) {
             $0.word1 = ""
             $0.word2 = ""
@@ -422,43 +543,6 @@ struct WordComparatorFeatureTests {
     }
     
     @Test
-    func recentComparisonsDelegateComparisonSelected() async {
-        let comparison = ComparisonHistory(
-            id: UUID(),
-            word1: "word1",
-            word2: "word2",
-            sentence: "This is a sentence",
-            response: "Response text",
-            date: Date(),
-            isRead: false
-        )
-        
-        let store = TestStore(initialState: WordComparatorFeature.State()) {
-            WordComparatorFeature()
-        } withDependencies: {
-            $0.backgroundTaskManager.addTask = { _, _, _ in }
-            $0.apiKeyManager = .testValue
-            try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
-        }
-        let rendered = await AttributedStringRenderer.renderMarkdown("Response text")
-        
-        await store.send(.recentComparisons(.delegate(.comparisonSelected(comparison)))) {
-            $0.detail = ResponseDetailFeature.State(
-                word1: "word1",
-                word2: "word2",
-                sentence: "This is a sentence",
-                streamingResponse: "Response text",
-                shouldStartStreaming: false
-            )
-            $0.detailPresentationToken = 1
-        }
-        await store.receive(\.detail.hydrateStoredResponse)
-        await store.receive(\.detail.attributedStringRendered) {
-            $0.detail?.attributedString = rendered
-        }
-    }
-    
-    @Test
     func pathHistoryListDelegateComparisonSelected() async {
         let comparison = ComparisonHistory(
             id: UUID(),
@@ -470,10 +554,16 @@ struct WordComparatorFeatureTests {
             isRead: false
         )
         
+        let box = LastReadStoreBox()
         let store = TestStore(initialState: WordComparatorFeature.State()) {
             WordComparatorFeature()
         } withDependencies: {
             $0.apiKeyManager = .testValue
+            $0.lastReadComparisonStore = .init(
+                get: { box.get() },
+                set: { box.set($0) },
+                clear: { box.set(nil) }
+            )
             try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
         }
         let rendered = await AttributedStringRenderer.renderMarkdown("Response text")
@@ -497,6 +587,7 @@ struct WordComparatorFeatureTests {
         await store.receive(\.detail.attributedStringRendered) {
             $0.detail?.attributedString = rendered
         }
+        #expect(box.get() == comparison.id.uuidString)
     }
     
     @Test

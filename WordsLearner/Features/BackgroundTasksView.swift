@@ -23,7 +23,7 @@ struct BackgroundTasksView: View {
         }
         .navigationTitle("Background Tasks")
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
             toolbarContent
@@ -269,4 +269,3 @@ struct StatusBadge: View {
         )
     }
 }
-

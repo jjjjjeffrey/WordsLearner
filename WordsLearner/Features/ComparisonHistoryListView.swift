@@ -19,7 +19,7 @@ struct ComparisonHistoryListView: View {
         }
         .navigationTitle("All Comparisons")
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         #endif
         .searchable(text: Binding(
             get: { store.searchText },
@@ -28,11 +28,8 @@ struct ComparisonHistoryListView: View {
         .background(AppColors.background)
         .toolbar {
             #if os(iOS)
-            ToolbarItem(placement: .navigationBarLeading) {
-                filterButton
-            }
             ToolbarItem(placement: .navigationBarTrailing) {
-                clearAllButton
+                historyActionsMenu
             }
             #else
             ToolbarItem(placement: .primaryAction) {
@@ -195,6 +192,19 @@ struct ComparisonHistoryListView: View {
         }
         .disabled(store.allComparisons.isEmpty)
     }
+
+    #if os(iOS)
+    private var historyActionsMenu: some View {
+        Menu {
+            filterButton
+            Divider()
+            clearAllButton
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .accessibilityLabel("History Actions")
+    }
+    #endif
     
     #if os(macOS)
     private var exportIsPresentedBinding: Binding<Bool> {

@@ -8,6 +8,8 @@
 import SwiftUI
 #if os(macOS)
 import AppKit
+#elseif os(iOS)
+import UIKit
 #endif
 import ComposableArchitecture
 import DependenciesTestSupport
@@ -22,6 +24,36 @@ import Testing
     .dependency(\.date.now, Date(timeIntervalSince1970: 1_234_567_890))
 )
 struct ComparisonHistoryListViewTests {
+#if os(iOS)
+    private func makeiOSPushedNavigationController<V: View>(_ view: V) -> UIViewController {
+        let root = UIViewController()
+        root.view.backgroundColor = .systemBackground
+        root.navigationItem.title = "Root"
+        if #available(iOS 14.0, *) {
+            root.navigationItem.backButtonDisplayMode = .minimal
+        }
+
+        let navigationController = UINavigationController(rootViewController: root)
+        let hosted = UIHostingController(rootView: view)
+        navigationController.pushViewController(hosted, animated: false)
+        navigationController.navigationBar.prefersLargeTitles = false
+        return navigationController
+    }
+
+    private func iOSSnapshotStrategy(
+        style: UIUserInterfaceStyle
+    ) -> Snapshotting<UIViewController, UIImage> {
+        .wait(
+            for: 0.2,
+            on: .image(
+                on: .iPhone12Pro,
+                drawHierarchyInKeyWindow: true,
+                traits: UITraitCollection(userInterfaceStyle: style)
+            )
+        )
+    }
+#endif
+
     @Test
     func comparisonHistoryListViewSeeded() {
         @Dependency(\.date.now) var now
@@ -57,23 +89,22 @@ struct ComparisonHistoryListViewTests {
             )
         }
 
-        let view = NavigationStack {
-            ComparisonHistoryListView(store: store)
-        }
+        let contentView = ComparisonHistoryListView(store: store)
 
 #if os(macOS)
+        let view = NavigationStack { contentView }
         let hosting = NSHostingController(rootView: view)
         let size = measuredFittingSize(for: view, width: 500)
         assertSnapshot(of: hosting, as: .imageHiDPI(size: size), named: "macOS")
 #elseif os(iOS) || os(tvOS)
         assertSnapshot(
-            of: view,
-            as: .image(traits: .init(userInterfaceStyle: .light)),
+            of: makeiOSPushedNavigationController(contentView),
+            as: iOSSnapshotStrategy(style: .light),
             named: "1"
         )
         assertSnapshot(
-            of: view,
-            as: .image(traits: .init(userInterfaceStyle: .dark)),
+            of: makeiOSPushedNavigationController(contentView),
+            as: iOSSnapshotStrategy(style: .dark),
             named: "2"
         )
 #endif
@@ -92,23 +123,22 @@ struct ComparisonHistoryListViewTests {
             )
         }
 
-        let view = NavigationStack {
-            ComparisonHistoryListView(store: store)
-        }
+        let contentView = ComparisonHistoryListView(store: store)
 
 #if os(macOS)
+        let view = NavigationStack { contentView }
         let hosting = NSHostingController(rootView: view)
         let size = measuredFittingSize(for: view, width: 500)
         assertSnapshot(of: hosting, as: .imageHiDPI(size: size), named: "macOS")
 #elseif os(iOS) || os(tvOS)
         assertSnapshot(
-            of: view,
-            as: .image(traits: .init(userInterfaceStyle: .light)),
+            of: makeiOSPushedNavigationController(contentView),
+            as: iOSSnapshotStrategy(style: .light),
             named: "1"
         )
         assertSnapshot(
-            of: view,
-            as: .image(traits: .init(userInterfaceStyle: .dark)),
+            of: makeiOSPushedNavigationController(contentView),
+            as: iOSSnapshotStrategy(style: .dark),
             named: "2"
         )
 #endif
