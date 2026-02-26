@@ -64,6 +64,7 @@ let copySwiftPMFrameworksScript = TargetScript.post(
 
 let appSettings: Settings = .settings(
     base: [
+        "PRODUCT_BUNDLE_IDENTIFIER": "com.jeffrey.wordslearner",
         "MARKETING_VERSION": "1.0",
         "CURRENT_PROJECT_VERSION": "4",
         "DEVELOPMENT_TEAM": "N2328YCXM3",
@@ -87,8 +88,18 @@ let appSettings: Settings = .settings(
         "TARGETED_DEVICE_FAMILY": "1,2"
     ],
     configurations: [
-        .debug(name: "Debug"),
-        .release(name: "Release")
+        .debug(
+            name: "Debug",
+            settings: [
+                "PRODUCT_BUNDLE_IDENTIFIER": "com.jeffrey.wordslearner.debug"
+            ]
+        ),
+        .release(
+            name: "Release",
+            settings: [
+                "PRODUCT_BUNDLE_IDENTIFIER": "com.jeffrey.wordslearner"
+            ]
+        )
     ],
     defaultSettings: .recommended
 )
@@ -132,7 +143,7 @@ let project = Project(
             name: "WordsLearner",
             destinations: [.iPhone, .iPad, .mac],
             product: .app,
-            bundleId: "com.jeffrey.wordslearner",
+            bundleId: "$(PRODUCT_BUNDLE_IDENTIFIER)",
             deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
             infoPlist: appInfoPlist,
             sources: ["WordsLearner/**"],
