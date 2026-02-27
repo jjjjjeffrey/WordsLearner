@@ -103,16 +103,20 @@ extension ComparisonGenerationServiceClient: DependencyKey {
     static var liveValue: Self {
         @Dependency(\.aiService) var aiService
         @Dependency(\.defaultDatabase) var database
-        @Dependency(\.date.now) var now
         let service = ComparisonGenerationService(aiService: aiService, database: database)
-        return Self.make(service: service, now: now)
+        return Self.make(service: service, now: {
+            @Dependency(\.date.now) var now
+            return now
+        })
     }
 
     nonisolated static var previewValue: Self {
         @Dependency(\.defaultDatabase) var database
-        @Dependency(\.date.now) var now
         let service = ComparisonGenerationService(aiService: .previewValue, database: database)
-        return Self.make(service: service, now: now)
+        return Self.make(service: service, now: {
+            @Dependency(\.date.now) var now
+            return now
+        })
     }
     
     nonisolated static var testValue: Self {
@@ -130,7 +134,7 @@ extension ComparisonGenerationServiceClient: DependencyKey {
 
     private static func make(
         service: ComparisonGenerationService,
-        now: Date
+        now: @escaping @Sendable () -> Date
     ) -> Self {
         Self(
             generateComparison: { word1, word2, sentence in
@@ -146,7 +150,7 @@ extension ComparisonGenerationServiceClient: DependencyKey {
                     word2: word2,
                     sentence: sentence,
                     response: response,
-                    date: now
+                    date: now()
                 )
             }
         )

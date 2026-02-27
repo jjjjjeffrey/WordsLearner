@@ -13,6 +13,20 @@ import Testing
 
 @MainActor
 struct DependencyPreviewIntegrationTests {
+    private final class IncrementingDateBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var counter: TimeInterval = 0
+
+        func next() -> Date {
+            lock.lock()
+            defer {
+                counter += 1
+                lock.unlock()
+            }
+            return Date(timeIntervalSince1970: 1_700_000_000 + counter)
+        }
+    }
+
     @Test
     func comparisonGeneratorPreviewValueStreamsAndSavesToHistory() async throws {
         try await withDependencies {
@@ -106,6 +120,34 @@ struct DependencyPreviewIntegrationTests {
                 savedHistory?.response.trimmingCharacters(in: .whitespacesAndNewlines)
                     == AIServiceClient.previewStreamString.trimmingCharacters(in: .whitespacesAndNewlines)
             )
+        }
+    }
+
+    @Test
+    func comparisonGeneratorPreviewValueUsesFreshDateForEachSave() async throws {
+        let box = IncrementingDateBox()
+
+        try await withDependencies {
+            $0.date = DateGenerator { box.next() }
+            try $0.bootstrapDatabase(useTest: true, seed: { _ in })
+        } operation: {
+            @Dependency(\.defaultDatabase) var database
+
+            let generator = ComparisonGenerationServiceClient.previewValue
+            try await generator.saveToHistory("accept", "except", "first", "response-1")
+            try await generator.saveToHistory("accept", "except", "second", "response-2")
+
+            let rows = try await database.read { db in
+                try ComparisonHistory
+                    .where { $0.word1 == "accept" && $0.word2 == "except" }
+                    .order { $0.date.asc() }
+                    .fetchAll(db)
+            }
+
+            #expect(rows.count == 2)
+            #expect(rows[0].date != rows[1].date)
+            #expect(rows[0].date == Date(timeIntervalSince1970: 1_700_000_000))
+            #expect(rows[1].date == Date(timeIntervalSince1970: 1_700_000_001))
         }
     }
 }
