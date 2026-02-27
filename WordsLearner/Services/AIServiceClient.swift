@@ -102,9 +102,19 @@ extension AIServiceClient: DependencyKey {
                             
                             let (asyncBytes, response) = try await URLSession.shared.bytes(for: request)
                             
-                            guard let httpResponse = response as? HTTPURLResponse,
-                                  httpResponse.statusCode == 200 else {
+                            guard let httpResponse = response as? HTTPURLResponse else {
                                 throw AIError.networkError
+                            }
+                            
+                            guard httpResponse.statusCode == 200 else {
+                                switch httpResponse.statusCode {
+                                case 401, 403:
+                                    throw AIError.authenticationError
+                                case 429:
+                                    throw AIError.rateLimitError
+                                default:
+                                    throw AIError.apiError(statusCode: httpResponse.statusCode)
+                                }
                             }
                             
                             for try await line in asyncBytes.lines {
@@ -128,6 +138,18 @@ extension AIServiceClient: DependencyKey {
                             }
                             
                             continuation.finish()
+                        } catch let urlError as URLError {
+                            switch urlError.code {
+                            case .notConnectedToInternet,
+                                 .networkConnectionLost,
+                                 .cannotFindHost,
+                                 .cannotConnectToHost,
+                                 .dnsLookupFailed,
+                                 .timedOut:
+                                continuation.finish(throwing: AIError.networkError)
+                            default:
+                                continuation.finish(throwing: urlError)
+                            }
                         } catch {
                             continuation.finish(throwing: error)
                         }
