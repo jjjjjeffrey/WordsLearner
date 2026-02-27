@@ -66,7 +66,7 @@ let appSettings: Settings = .settings(
     base: [
         "PRODUCT_BUNDLE_IDENTIFIER": "com.jeffrey.wordslearner",
         "MARKETING_VERSION": "1.0",
-        "CURRENT_PROJECT_VERSION": "5",
+        "CURRENT_PROJECT_VERSION": "6",
         "DEVELOPMENT_TEAM": "N2328YCXM3",
         "CODE_SIGN_STYLE": "Automatic",
         "CODE_SIGN_ENTITLEMENTS": "WordsLearner/WordsLearner.entitlements",
