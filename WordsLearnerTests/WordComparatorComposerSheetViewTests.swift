@@ -23,6 +23,7 @@ struct WordComparatorComposerSheetViewTests {
             state.word2 = "except"
             state.sentence = "I accept all terms except this one."
             state.hasValidAPIKey = true
+            state.hasValidElevenLabsAPIKey = true
 
             let view = WordComparatorComposerSheetView(
                 store: Store(initialState: state) {
@@ -100,4 +101,3 @@ struct WordComparatorComposerSheetViewTests {
         }
     }
 }
-
