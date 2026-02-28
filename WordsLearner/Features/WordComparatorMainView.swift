@@ -153,6 +153,13 @@ struct WordComparatorMainView: View {
                 Text("Select Background Tasks from sidebar")
                     .foregroundStyle(.secondary)
             }
+        case .multimodalLessons:
+            if let multimodalStore = store.scope(state: \.multimodalLessons, action: \.multimodalLessons) {
+                MultimodalLessonsView(store: multimodalStore)
+            } else {
+                Text("Select Multimodal Lessons from sidebar")
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -164,8 +171,23 @@ struct WordComparatorMainView: View {
 
     @ViewBuilder
     private var detailColumn: some View {
-        if let detailStore = store.scope(state: \.detail, action: \.detail) {
-            ResponseDetailView(store: detailStore)
+        switch store.sidebarSelection ?? .history {
+        case .multimodalLessons:
+            if let multimodalStore = store.scope(state: \.multimodalLessons, action: \.multimodalLessons) {
+                MultimodalLessonDetailView(store: multimodalStore)
+                    #if os(iOS)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            newComparisonIconButton
+                        }
+                    }
+                    #endif
+            } else {
+                ContentUnavailableView(
+                    "No Lesson Selected",
+                    systemImage: "photo.on.rectangle.angled",
+                    description: Text("Choose a multimodal lesson to view details.")
+                )
                 #if os(iOS)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -173,19 +195,32 @@ struct WordComparatorMainView: View {
                     }
                 }
                 #endif
-        } else {
-            ContentUnavailableView(
-                "No Comparison Selected",
-                systemImage: "text.bubble",
-                description: Text("Choose a comparison to view details.")
-            )
-            #if os(iOS)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    newComparisonIconButton
-                }
             }
-            #endif
+
+        case .history, .backgroundTasks:
+            if let detailStore = store.scope(state: \.detail, action: \.detail) {
+                ResponseDetailView(store: detailStore)
+                    #if os(iOS)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            newComparisonIconButton
+                        }
+                    }
+                    #endif
+            } else {
+                ContentUnavailableView(
+                    "No Comparison Selected",
+                    systemImage: "text.bubble",
+                    description: Text("Choose a comparison to view details.")
+                )
+                #if os(iOS)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        newComparisonIconButton
+                    }
+                }
+                #endif
+            }
         }
     }
 

@@ -183,6 +183,81 @@ func createAppDatabase(
         )
         .execute(db)
     }
+
+    // Migration for multimodal lessons
+    migrator.registerMigration("v1.4 - Create multimodal lessons tables") { db in
+        try #sql(
+            """
+            CREATE TABLE "multimodalLessons" (
+                "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+                "word1" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "word2" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "userSentence" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "status" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT 'generating',
+                "storyboardJSON" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "stylePreset" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT 'simple_educational_illustration_v1',
+                "voicePreset" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT 'elevenlabs_default_v1',
+                "imageModel" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT 'google/gemini-2.5-flash-image',
+                "audioModel" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT 'eleven_multilingual_v2',
+                "generatorVersion" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT 'v1',
+                "claritySelfRating" INTEGER,
+                "lessonDurationSeconds" REAL,
+                "errorMessage" TEXT,
+                "createdAt" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP,
+                "updatedAt" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP,
+                "completedAt" TEXT
+            ) STRICT
+            """
+        )
+        .execute(db)
+
+        try #sql(
+            """
+            CREATE INDEX "idx_multimodalLessons_createdAt"
+            ON "multimodalLessons" ("createdAt" DESC)
+            """
+        )
+        .execute(db)
+
+        try #sql(
+            """
+            CREATE INDEX "idx_multimodalLessons_status"
+            ON "multimodalLessons" ("status")
+            """
+        )
+        .execute(db)
+
+        try #sql(
+            """
+            CREATE TABLE "multimodalLessonFrames" (
+                "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+                "lessonID" TEXT NOT NULL,
+                "frameIndex" INTEGER NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+                "frameRole" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "title" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "caption" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "narrationText" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "imagePrompt" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "imageRelativePath" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "audioRelativePath" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '',
+                "audioDurationSeconds" REAL,
+                "checkPrompt" TEXT,
+                "expectedAnswer" TEXT,
+                "createdAt" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP,
+                "updatedAt" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT CURRENT_TIMESTAMP
+            ) STRICT
+            """
+        )
+        .execute(db)
+
+        try #sql(
+            """
+            CREATE INDEX "idx_multimodalLessonFrames_lessonID"
+            ON "multimodalLessonFrames" ("lessonID")
+            """
+        )
+        .execute(db)
+    }
     
     // Optional: Create Full-Text Search table for advanced search
     migrator.registerMigration("v1.1 - Create FTS table") { db in

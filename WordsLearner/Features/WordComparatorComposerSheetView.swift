@@ -16,7 +16,7 @@ struct WordComparatorComposerSheetView: View {
                 VStack(spacing: 20) {
                     headerView
 
-                    if !store.hasValidAPIKey {
+                    if !store.hasValidAPIKey || !store.hasValidElevenLabsAPIKey {
                         apiKeyWarningView
                     }
 
@@ -70,12 +70,12 @@ struct WordComparatorComposerSheetView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.orange)
 
-                Text("API Key Required")
+                Text("API Keys Required")
                     .font(.headline)
                     .foregroundColor(.orange)
             }
 
-            Text("Please configure your AIHubMix API key in settings to use this app")
+            Text("Configure AIHubMix and ElevenLabs API keys in settings to generate text and multimodal lessons.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -124,55 +124,80 @@ struct WordComparatorComposerSheetView: View {
     }
 
     private var generateButtonsView: some View {
-        HStack(spacing: 12) {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                Button {
+                    store.send(.generateButtonTapped)
+                } label: {
+                    HStack {
+                        Image(systemName: "sparkles")
+                        Text("Generate")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill((store.canGenerate && store.hasValidAPIKey) ? AppColors.primary : AppColors.separator)
+                    )
+                    .foregroundColor((store.canGenerate && store.hasValidAPIKey) ? .white : .gray)
+                }
+                .disabled(!store.canGenerate || !store.hasValidAPIKey)
+
+                Button {
+                    store.send(.generateInBackgroundButtonTapped)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.down.circle")
+                        #if os(iOS)
+                        if horizontalSizeClass == .regular {
+                            Text("Background")
+                                .fontWeight(.semibold)
+                        }
+                        #else
+                        Text("Background")
+                            .fontWeight(.semibold)
+                        #endif
+
+                        if store.pendingTasksCount > 0 {
+                            Text("(\(store.pendingTasksCount))")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                        }
+                    }
+                    .frame(minWidth: platformButtonWidth())
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill((store.canGenerate && store.hasValidAPIKey) ? AppColors.secondary : AppColors.separator)
+                    )
+                    .foregroundColor((store.canGenerate && store.hasValidAPIKey) ? .white : .gray)
+                }
+                .disabled(!store.canGenerate || !store.hasValidAPIKey)
+            }
+
             Button {
-                store.send(.generateButtonTapped)
+                store.send(.generateMultimodalButtonTapped)
             } label: {
-                HStack {
-                    Image(systemName: "sparkles")
-                    Text("Generate")
+                HStack(spacing: 8) {
+                    if store.isGeneratingMultimodalLesson {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "photo.on.rectangle.angled")
+                    }
+                    Text(store.isGeneratingMultimodalLesson ? "Generating Multimodal..." : "Generate Multimodal")
                         .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill((store.canGenerate && store.hasValidAPIKey) ? AppColors.primary : AppColors.separator)
+                        .fill(canGenerateMultimodal ? AppColors.secondary : AppColors.separator)
                 )
-                .foregroundColor((store.canGenerate && store.hasValidAPIKey) ? .white : .gray)
+                .foregroundColor(canGenerateMultimodal ? .white : .gray)
             }
-            .disabled(!store.canGenerate || !store.hasValidAPIKey)
-
-            Button {
-                store.send(.generateInBackgroundButtonTapped)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.down.circle")
-                    #if os(iOS)
-                    if horizontalSizeClass == .regular {
-                        Text("Background")
-                            .fontWeight(.semibold)
-                    }
-                    #else
-                    Text("Background")
-                        .fontWeight(.semibold)
-                    #endif
-
-                    if store.pendingTasksCount > 0 {
-                        Text("(\(store.pendingTasksCount))")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                    }
-                }
-                .frame(minWidth: platformButtonWidth())
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill((store.canGenerate && store.hasValidAPIKey) ? AppColors.secondary : AppColors.separator)
-                )
-                .foregroundColor((store.canGenerate && store.hasValidAPIKey) ? .white : .gray)
-            }
-            .disabled(!store.canGenerate || !store.hasValidAPIKey)
+            .disabled(!canGenerateMultimodal)
         }
     }
 
@@ -187,5 +212,12 @@ struct WordComparatorComposerSheetView: View {
         return 120
         #endif
     }
-}
 
+    private var canGenerateMultimodal: Bool {
+        !store.word1.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !store.word2.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            store.hasValidAPIKey &&
+            store.hasValidElevenLabsAPIKey &&
+            !store.isGeneratingMultimodalLesson
+    }
+}

@@ -137,6 +137,7 @@ struct WordComparatorFeatureTests {
         
         await store.send(.onAppear) {
             $0.hasValidAPIKey = true
+            $0.hasValidElevenLabsAPIKey = true
             $0.historyList = ComparisonHistoryListFeature.State()
         }
     }
@@ -168,6 +169,7 @@ struct WordComparatorFeatureTests {
         
         await store.send(.onAppear) {
             $0.hasValidAPIKey = true
+            $0.hasValidElevenLabsAPIKey = true
             $0.historyList = ComparisonHistoryListFeature.State()
         }
     }
@@ -196,6 +198,7 @@ struct WordComparatorFeatureTests {
 
         await store.send(.onAppear) {
             $0.hasValidAPIKey = true
+            $0.hasValidElevenLabsAPIKey = true
             $0.historyList = ComparisonHistoryListFeature.State()
         }
         await store.receive(\.lastReadComparisonLoaded) {
@@ -232,6 +235,7 @@ struct WordComparatorFeatureTests {
 
         await store.send(.onAppear) {
             $0.hasValidAPIKey = true
+            $0.hasValidElevenLabsAPIKey = true
             $0.historyList = ComparisonHistoryListFeature.State()
         }
 
@@ -539,6 +543,7 @@ struct WordComparatorFeatureTests {
         
         await store.send(.settings(.presented(.delegate(.apiKeyChanged)))) {
             $0.hasValidAPIKey = true
+            $0.hasValidElevenLabsAPIKey = true
         }
     }
     

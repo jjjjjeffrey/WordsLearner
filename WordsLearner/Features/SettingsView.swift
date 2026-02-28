@@ -32,11 +32,20 @@ struct SettingsView: View {
                 }
                 
                 Section {
-                    apiKeyInputSection
+                    aiHubMixAPIKeyInputSection
                 } header: {
                     Text("AIHubMix API Key")
                 } footer: {
                     Text("Your API key is stored securely in the device keychain and never shared.")
+                        .font(.caption)
+                }
+
+                Section {
+                    elevenLabsAPIKeyInputSection
+                } header: {
+                    Text("ElevenLabs API Key")
+                } footer: {
+                    Text("Used for multimodal audio narration generation.")
                         .font(.caption)
                 }
                 
@@ -78,7 +87,8 @@ struct SettingsView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     headerSection
-                    apiKeySection
+                    aiHubMixAPIKeySection
+                    elevenLabsAPIKeySection
                     statusSection
                     helpSection
                 }
@@ -104,7 +114,7 @@ struct SettingsView: View {
         .padding()
     }
     
-    private var apiKeySection: some View {
+    private var aiHubMixAPIKeySection: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -144,6 +154,47 @@ struct SettingsView: View {
             .padding(16)
         }
     }
+
+    private var elevenLabsAPIKeySection: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("ElevenLabs API Key").font(.headline)
+                    Text("Enter your ElevenLabs API key to generate audio narrations")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                HStack(spacing: 12) {
+                    Group {
+                        if store.isElevenLabsAPIKeyVisible {
+                            TextField("Enter your ElevenLabs API key", text: $store.elevenLabsAPIKeyInput)
+                        } else {
+                            SecureField("Enter your ElevenLabs API key", text: $store.elevenLabsAPIKeyInput)
+                        }
+                    }
+                    .textFieldStyle(.roundedBorder)
+
+                    Button { store.send(.toggleElevenLabsVisibilityButtonTapped) } label: {
+                        Image(systemName: store.isElevenLabsAPIKeyVisible ? "eye.slash" : "eye")
+                    }
+                }
+
+                HStack(spacing: 12) {
+                    Button("Save") { store.send(.saveElevenLabsButtonTapped) }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(store.elevenLabsAPIKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    Button("Clear") { store.send(.clearElevenLabsButtonTapped) }
+                        .buttonStyle(.bordered)
+                        .foregroundColor(.red)
+
+                    Spacer()
+                }
+            }
+            .padding(16)
+        }
+    }
     #endif
     
     // MARK: - Shared Components
@@ -157,7 +208,7 @@ struct SettingsView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Enter your AIHubMix API key to enable word comparison features")
+            Text("Configure AIHubMix and ElevenLabs API keys for text and audio generation")
                 .font(.caption)
                 .foregroundColor(AppColors.secondaryText)
                 .multilineTextAlignment(.center)
@@ -166,7 +217,7 @@ struct SettingsView: View {
         .padding(.vertical)
     }
     
-    private var apiKeyInputSection: some View {
+    private var aiHubMixAPIKeyInputSection: some View {
         VStack(spacing: 12) {
             HStack {
                 if store.isAPIKeyVisible {
@@ -196,6 +247,37 @@ struct SettingsView: View {
             }
         }
     }
+
+    private var elevenLabsAPIKeyInputSection: some View {
+        VStack(spacing: 12) {
+            HStack {
+                if store.isElevenLabsAPIKeyVisible {
+                    TextField("Enter your ElevenLabs API key", text: $store.elevenLabsAPIKeyInput)
+                        .textFieldStyle(.roundedBorder)
+                } else {
+                    SecureField("Enter your ElevenLabs API key", text: $store.elevenLabsAPIKeyInput)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                Button { store.send(.toggleElevenLabsVisibilityButtonTapped) } label: {
+                    Image(systemName: store.isElevenLabsAPIKeyVisible ? "eye.slash" : "eye")
+                        .foregroundColor(AppColors.secondaryText)
+                }
+            }
+
+            HStack(spacing: 12) {
+                Button("Save") { store.send(.saveElevenLabsButtonTapped) }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(store.elevenLabsAPIKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                Button("Clear") { store.send(.clearElevenLabsButtonTapped) }
+                    .buttonStyle(.bordered)
+                    .foregroundColor(AppColors.error)
+
+                Spacer()
+            }
+        }
+    }
     
     private var statusSection: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -204,7 +286,7 @@ struct SettingsView: View {
                     .fill(store.hasValidAPIKey ? AppColors.success : AppColors.error)
                     .frame(width: 12, height: 12)
                 
-                Text(store.hasValidAPIKey ? "API Key Configured" : "No API Key")
+                Text(store.hasValidAPIKey ? "AIHubMix Key Configured" : "No AIHubMix Key")
                     .font(.subheadline)
                     .fontWeight(.medium)
                 
@@ -213,6 +295,25 @@ struct SettingsView: View {
             
             if store.hasValidAPIKey && !store.currentMaskedKey.isEmpty {
                 Text("Current key: \(store.currentMaskedKey)")
+                    .font(.caption)
+                    .foregroundColor(AppColors.secondaryText)
+                    .fontDesign(.monospaced)
+            }
+
+            HStack {
+                Circle()
+                    .fill(store.hasValidElevenLabsAPIKey ? AppColors.success : AppColors.error)
+                    .frame(width: 12, height: 12)
+
+                Text(store.hasValidElevenLabsAPIKey ? "ElevenLabs Key Configured" : "No ElevenLabs Key")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                Spacer()
+            }
+
+            if store.hasValidElevenLabsAPIKey && !store.currentMaskedElevenLabsKey.isEmpty {
+                Text("ElevenLabs key: \(store.currentMaskedElevenLabsKey)")
                     .font(.caption)
                     .foregroundColor(AppColors.secondaryText)
                     .fontDesign(.monospaced)
@@ -229,6 +330,11 @@ struct SettingsView: View {
             
             Link(destination: URL(string: "https://aihubmix.com/docs")!) {
                 Label("API Documentation", systemImage: "book")
+                    .foregroundColor(AppColors.primary)
+            }
+
+            Link(destination: URL(string: "https://elevenlabs.io")!) {
+                Label("Get API Key from ElevenLabs", systemImage: "link")
                     .foregroundColor(AppColors.primary)
             }
         }
@@ -260,5 +366,4 @@ struct SettingsView: View {
     }
 }
 #endif
-
 

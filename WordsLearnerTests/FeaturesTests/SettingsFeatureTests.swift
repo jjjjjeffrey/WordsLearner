@@ -95,6 +95,35 @@ struct SettingsFeatureTests {
             $0.currentMaskedKey = expectedMasked
         }
     }
+
+    @Test
+    func onAppearWithExistingElevenLabsAPIKey() async {
+        let elevenLabsKey = "elevenlabs-api-key-1234567890"
+        let expectedMasked = "elev••••••••7890"
+
+        let store = TestStore(initialState: SettingsFeature.State()) {
+            SettingsFeature()
+        } withDependencies: {
+            $0.apiKeyManager = APIKeyManagerClient(
+                hasValidAPIKey: { false },
+                getAPIKey: { "" },
+                saveAPIKey: { _ in true },
+                deleteAPIKey: { true },
+                validateAPIKey: { _ in true },
+                hasValidElevenLabsAPIKey: { true },
+                getElevenLabsAPIKey: { elevenLabsKey },
+                saveElevenLabsAPIKey: { _ in true },
+                deleteElevenLabsAPIKey: { true },
+                validateElevenLabsAPIKey: { _ in true }
+            )
+        }
+
+        await store.send(.onAppear) {
+            $0.elevenLabsAPIKeyInput = elevenLabsKey
+            $0.hasValidElevenLabsAPIKey = true
+            $0.currentMaskedElevenLabsKey = expectedMasked
+        }
+    }
     
     // MARK: - saveButtonTapped Action Tests
     
@@ -239,6 +268,52 @@ struct SettingsFeatureTests {
         
         await store.receive(.delegate(.apiKeyChanged))
     }
+
+    @Test
+    func saveElevenLabsButtonTappedWithValidAPIKey() async {
+        let key = "elevenlabs-api-key-1234567890"
+        let expectedMasked = "elev••••••••7890"
+
+        let store = TestStore(initialState: SettingsFeature.State(
+            elevenLabsAPIKeyInput: key
+        )) {
+            SettingsFeature()
+        } withDependencies: {
+            $0.apiKeyManager = APIKeyManagerClient(
+                hasValidAPIKey: { false },
+                getAPIKey: { "" },
+                saveAPIKey: { _ in true },
+                deleteAPIKey: { true },
+                validateAPIKey: { _ in true },
+                hasValidElevenLabsAPIKey: { true },
+                getElevenLabsAPIKey: { key },
+                saveElevenLabsAPIKey: { saved in
+                    #expect(saved == key)
+                    return true
+                },
+                deleteElevenLabsAPIKey: { true },
+                validateElevenLabsAPIKey: { validated in
+                    #expect(validated == key)
+                    return true
+                }
+            )
+        }
+
+        await store.send(.saveElevenLabsButtonTapped) {
+            $0.hasValidElevenLabsAPIKey = true
+            $0.currentMaskedElevenLabsKey = expectedMasked
+            $0.alert = AlertState {
+                TextState("Success")
+            } actions: {
+                ButtonState(role: .cancel) {
+                    TextState("OK")
+                }
+            } message: {
+                TextState("ElevenLabs API key saved successfully")
+            }
+        }
+        await store.receive(.delegate(.apiKeyChanged))
+    }
     
     // MARK: - clearButtonTapped Action Tests
     
@@ -303,6 +378,46 @@ struct SettingsFeatureTests {
         #expect(store.state.hasValidAPIKey == true)
         #expect(store.state.currentMaskedKey == "exis••••••••-key")
         #expect(store.state.alert == nil)
+    }
+
+    @Test
+    func clearElevenLabsButtonTappedSuccessfully() async {
+        let store = TestStore(initialState: SettingsFeature.State(
+            elevenLabsAPIKeyInput: "existing-elevenlabs-key",
+            hasValidElevenLabsAPIKey: true,
+            currentMaskedElevenLabsKey: "exis••••••••-key"
+        )) {
+            SettingsFeature()
+        } withDependencies: {
+            $0.apiKeyManager = APIKeyManagerClient(
+                hasValidAPIKey: { false },
+                getAPIKey: { "" },
+                saveAPIKey: { _ in true },
+                deleteAPIKey: { true },
+                validateAPIKey: { _ in true },
+                hasValidElevenLabsAPIKey: { false },
+                getElevenLabsAPIKey: { "" },
+                saveElevenLabsAPIKey: { _ in true },
+                deleteElevenLabsAPIKey: { true },
+                validateElevenLabsAPIKey: { _ in true }
+            )
+        }
+
+        await store.send(.clearElevenLabsButtonTapped) {
+            $0.elevenLabsAPIKeyInput = ""
+            $0.hasValidElevenLabsAPIKey = false
+            $0.currentMaskedElevenLabsKey = ""
+            $0.alert = AlertState {
+                TextState("Success")
+            } actions: {
+                ButtonState(role: .cancel) {
+                    TextState("OK")
+                }
+            } message: {
+                TextState("ElevenLabs API key cleared successfully")
+            }
+        }
+        await store.receive(.delegate(.apiKeyChanged))
     }
     
     // MARK: - toggleVisibilityButtonTapped Action Tests

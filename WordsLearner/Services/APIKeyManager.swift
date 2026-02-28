@@ -14,7 +14,8 @@ class APIKeyManager: ObservableObject {
     @Published var hasValidAPIKey: Bool = false
     
     private let service = "EnglishWordComparatorApp"
-    private let account = "aihubmix-api-key"
+    private let aihubmixAccount = "aihubmix-api-key"
+    private let elevenLabsAccount = "elevenlabs-api-key"
     
     static let shared: APIKeyManager = .init()
     
@@ -23,10 +24,54 @@ class APIKeyManager: ObservableObject {
     }
     
     func saveAPIKey(_ key: String) -> Bool {
-        let keyData = key.data(using: .utf8)!
+        let success = saveKey(key, account: aihubmixAccount)
         
-        // Delete any existing key first
-        deleteAPIKey()
+        if success {
+            hasValidAPIKey = !key.isEmpty
+        }
+        
+        return success
+    }
+    
+    func getAPIKey() -> String {
+        getKey(account: aihubmixAccount)
+    }
+    
+    func deleteAPIKey() -> Bool {
+        let success = deleteKey(account: aihubmixAccount)
+        
+        if success {
+            hasValidAPIKey = false
+        }
+        
+        return success
+    }
+
+    func saveElevenLabsAPIKey(_ key: String) -> Bool {
+        saveKey(key, account: elevenLabsAccount)
+    }
+
+    func getElevenLabsAPIKey() -> String {
+        getKey(account: elevenLabsAccount)
+    }
+
+    func deleteElevenLabsAPIKey() -> Bool {
+        deleteKey(account: elevenLabsAccount)
+    }
+
+    func validateElevenLabsAPIKey(_ key: String) -> Bool {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && !trimmed.contains(" ") && trimmed.count >= 20
+    }
+
+    func validateAPIKey(_ key: String) -> Bool {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed.count > 10 && !trimmed.contains(" ")
+    }
+
+    private func saveKey(_ key: String, account: String) -> Bool {
+        let keyData = key.data(using: .utf8)!
+        _ = deleteKey(account: account)
         
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -37,16 +82,10 @@ class APIKeyManager: ObservableObject {
         ]
         
         let status = SecItemAdd(query as CFDictionary, nil)
-        let success = status == errSecSuccess
-        
-        if success {
-            hasValidAPIKey = !key.isEmpty
-        }
-        
-        return success
+        return status == errSecSuccess
     }
-    
-    func getAPIKey() -> String {
+
+    private func getKey(account: String) -> String {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -60,14 +99,14 @@ class APIKeyManager: ObservableObject {
         
         if status == errSecSuccess,
            let data = result as? Data,
-           let apiKey = String(data: data, encoding: .utf8) {
-            return apiKey
+           let key = String(data: data, encoding: .utf8) {
+            return key
         }
         
         return ""
     }
-    
-    func deleteAPIKey() -> Bool {
+
+    private func deleteKey(account: String) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -75,19 +114,6 @@ class APIKeyManager: ObservableObject {
         ]
         
         let status = SecItemDelete(query as CFDictionary)
-        let success = status == errSecSuccess || status == errSecItemNotFound
-        
-        if success {
-            hasValidAPIKey = false
-        }
-        
-        return success
-    }
-    
-    func validateAPIKey(_ key: String) -> Bool {
-        // Basic validation - you can make this more sophisticated
-        return !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-               key.count > 10 && // Reasonable minimum length
-               !key.contains(" ") // API keys typically don't have spaces
+        return status == errSecSuccess || status == errSecItemNotFound
     }
 }

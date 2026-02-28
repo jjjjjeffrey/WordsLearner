@@ -15,6 +15,7 @@ struct WordComparatorFeature {
     enum SidebarItem: String, CaseIterable, Equatable, Hashable, Identifiable {
         case history
         case backgroundTasks
+        case multimodalLessons
 
         var id: Self { self }
 
@@ -24,6 +25,8 @@ struct WordComparatorFeature {
                 return "History"
             case .backgroundTasks:
                 return "Background Tasks"
+            case .multimodalLessons:
+                return "Multimodal History"
             }
         }
 
@@ -33,6 +36,8 @@ struct WordComparatorFeature {
                 return "clock"
             case .backgroundTasks:
                 return "line.3.horizontal.decrease.circle"
+            case .multimodalLessons:
+                return "photo.on.rectangle.angled"
             }
         }
     }
@@ -43,6 +48,8 @@ struct WordComparatorFeature {
         var word2: String = ""
         var sentence: String = ""
         var hasValidAPIKey: Bool = false
+        var hasValidElevenLabsAPIKey: Bool = false
+        var isGeneratingMultimodalLesson: Bool = false
         
         // For observing background tasks in the main view
         @ObservationStateIgnored
@@ -57,6 +64,7 @@ struct WordComparatorFeature {
         var isComposerSheetPresented = false
         var historyList: ComparisonHistoryListFeature.State?
         var backgroundTasks: BackgroundTasksFeature.State?
+        var multimodalLessons: MultimodalLessonsFeature.State?
         var detail: ResponseDetailFeature.State?
         var detailPresentationToken: Int = 0
 
@@ -80,13 +88,17 @@ struct WordComparatorFeature {
         case lastReadComparisonLoaded(ComparisonHistory?)
         case newComparisonButtonTapped
         case generateButtonTapped
+        case generateMultimodalButtonTapped
         case generateInBackgroundButtonTapped
+        case multimodalLessonGenerated(UUID)
+        case multimodalLessonGenerationFailed(String)
         case settingsButtonTapped
         case historyListButtonTapped
         case backgroundTasksButtonTapped
         case settings(PresentationAction<SettingsFeature.Action>)
         case historyList(ComparisonHistoryListFeature.Action)
         case backgroundTasks(BackgroundTasksFeature.Action)
+        case multimodalLessons(MultimodalLessonsFeature.Action)
         case detail(ResponseDetailFeature.Action)
         case detailDismissed
         case alert(PresentationAction<Alert>)
@@ -102,6 +114,7 @@ struct WordComparatorFeature {
     @Dependency(\.backgroundTaskManager) var taskManager
     @Dependency(\.defaultDatabase) var database
     @Dependency(\.lastReadComparisonStore) var lastReadComparisonStore
+    @Dependency(\.multimodalLessonGenerator) var multimodalLessonGenerator
     
     var body: some Reducer<State, Action> {
         BindingReducer()
@@ -110,6 +123,7 @@ struct WordComparatorFeature {
             switch action {
             case .onAppear:
                 state.hasValidAPIKey = apiKeyManager.hasValidAPIKey()
+                state.hasValidElevenLabsAPIKey = apiKeyManager.hasValidElevenLabsAPIKey()
                 activateSelection(&state)
                 return .merge(
                     .run { [taskManager] _ in
@@ -189,6 +203,37 @@ struct WordComparatorFeature {
                     .send(.clearInputFields),
                     .send(.detail(.startStreaming))
                 )
+
+            case .generateMultimodalButtonTapped:
+                guard
+                    !state.word1.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    !state.word2.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    state.hasValidAPIKey,
+                    state.hasValidElevenLabsAPIKey,
+                    !state.isGeneratingMultimodalLesson
+                else { return .none }
+
+                let word1 = state.word1
+                let word2 = state.word2
+                let sentence = state.sentence.trimmingCharacters(in: .whitespacesAndNewlines)
+                state.isGeneratingMultimodalLesson = true
+                state.isComposerSheetPresented = false
+                state.sidebarSelection = .multimodalLessons
+                activateSelection(&state)
+
+                return .run { [multimodalLessonGenerator] send in
+                    do {
+                        let lessonID = try await multimodalLessonGenerator.generateLesson(
+                            word1,
+                            word2,
+                            sentence.isEmpty ? nil : sentence
+                        ) { _ in }
+                        await send(.multimodalLessonGenerated(lessonID))
+                        await send(.clearInputFields)
+                    } catch {
+                        await send(.multimodalLessonGenerationFailed(error.localizedDescription))
+                    }
+                }
                 
             case .generateInBackgroundButtonTapped:
                 guard state.canGenerate && state.hasValidAPIKey else { return .none }
@@ -210,6 +255,25 @@ struct WordComparatorFeature {
             case .taskAddedSuccessfully:
                 state.isComposerSheetPresented = false
                 return .none
+
+            case let .multimodalLessonGenerated(lessonID):
+                state.isGeneratingMultimodalLesson = false
+                state.sidebarSelection = .multimodalLessons
+                activateSelection(&state)
+                return .send(.multimodalLessons(.lessonTapped(lessonID)))
+
+            case let .multimodalLessonGenerationFailed(errorMessage):
+                state.isGeneratingMultimodalLesson = false
+                state.alert = AlertState {
+                    TextState("Multimodal Generation Failed")
+                } actions: {
+                    ButtonState(role: .cancel) {
+                        TextState("OK")
+                    }
+                } message: {
+                    TextState(errorMessage)
+                }
+                return .none
                 
             case .clearInputFields:
                 state.word1 = ""
@@ -224,6 +288,7 @@ struct WordComparatorFeature {
                 
             case .settings(.presented(.delegate(.apiKeyChanged))):
                 state.hasValidAPIKey = apiKeyManager.hasValidAPIKey()
+                state.hasValidElevenLabsAPIKey = apiKeyManager.hasValidElevenLabsAPIKey()
                 return .none
                 
             case let .historyList(.delegate(.comparisonSelected(comparison))):
@@ -263,6 +328,9 @@ struct WordComparatorFeature {
             case .backgroundTasks:
                 return .none
 
+            case .multimodalLessons:
+                return .none
+
             case .detail:
                 return .none
 
@@ -286,6 +354,9 @@ struct WordComparatorFeature {
         .ifLet(\.backgroundTasks, action: \.backgroundTasks) {
             BackgroundTasksFeature()
         }
+        .ifLet(\.multimodalLessons, action: \.multimodalLessons) {
+            MultimodalLessonsFeature()
+        }
         .ifLet(\.detail, action: \.detail) {
             ResponseDetailFeature()
         }
@@ -300,6 +371,7 @@ struct WordComparatorFeature {
             state.sidebarSelection = .history
             state.historyList = nil
             state.backgroundTasks = nil
+            state.multimodalLessons = nil
             state.detail = nil
             return
         }
@@ -310,12 +382,20 @@ struct WordComparatorFeature {
                 state.historyList = ComparisonHistoryListFeature.State()
             }
             state.backgroundTasks = nil
+            state.multimodalLessons = nil
 
         case .backgroundTasks:
             if state.backgroundTasks == nil {
                 state.backgroundTasks = BackgroundTasksFeature.State()
             }
             state.historyList = nil
+            state.multimodalLessons = nil
+        case .multimodalLessons:
+            if state.multimodalLessons == nil {
+                state.multimodalLessons = MultimodalLessonsFeature.State()
+            }
+            state.historyList = nil
+            state.backgroundTasks = nil
         }
 
         if selection != .history {

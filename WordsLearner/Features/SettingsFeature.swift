@@ -13,9 +13,13 @@ struct SettingsFeature {
     @ObservableState
     struct State: Equatable {
         var apiKeyInput: String = ""
+        var elevenLabsAPIKeyInput: String = ""
         var isAPIKeyVisible: Bool = false
+        var isElevenLabsAPIKeyVisible: Bool = false
         var hasValidAPIKey: Bool = false
+        var hasValidElevenLabsAPIKey: Bool = false
         var currentMaskedKey: String = ""
+        var currentMaskedElevenLabsKey: String = ""
         @Presents var alert: AlertState<Action.Alert>?
     }
     
@@ -25,6 +29,9 @@ struct SettingsFeature {
         case saveButtonTapped
         case clearButtonTapped
         case toggleVisibilityButtonTapped
+        case saveElevenLabsButtonTapped
+        case clearElevenLabsButtonTapped
+        case toggleElevenLabsVisibilityButtonTapped
         case alert(PresentationAction<Alert>)
         case delegate(Delegate)
         
@@ -48,6 +55,12 @@ struct SettingsFeature {
                 if !currentKey.isEmpty {
                     state.apiKeyInput = currentKey
                     state.currentMaskedKey = maskAPIKey(currentKey)
+                }
+                let currentElevenLabsKey = apiKeyManager.getElevenLabsAPIKey()
+                state.hasValidElevenLabsAPIKey = !currentElevenLabsKey.isEmpty
+                if !currentElevenLabsKey.isEmpty {
+                    state.elevenLabsAPIKeyInput = currentElevenLabsKey
+                    state.currentMaskedElevenLabsKey = maskAPIKey(currentElevenLabsKey)
                 }
                 return .none
                 
@@ -113,6 +126,68 @@ struct SettingsFeature {
                 
             case .toggleVisibilityButtonTapped:
                 state.isAPIKeyVisible.toggle()
+                return .none
+
+            case .saveElevenLabsButtonTapped:
+                let trimmedKey = state.elevenLabsAPIKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard apiKeyManager.validateElevenLabsAPIKey(trimmedKey) else {
+                    state.alert = AlertState {
+                        TextState("Invalid ElevenLabs API Key")
+                    } actions: {
+                        ButtonState(role: .cancel) {
+                            TextState("OK")
+                        }
+                    } message: {
+                        TextState("Please enter a valid ElevenLabs API key")
+                    }
+                    return .none
+                }
+                if apiKeyManager.saveElevenLabsAPIKey(trimmedKey) {
+                    state.hasValidElevenLabsAPIKey = true
+                    state.currentMaskedElevenLabsKey = maskAPIKey(trimmedKey)
+                    state.alert = AlertState {
+                        TextState("Success")
+                    } actions: {
+                        ButtonState(role: .cancel) {
+                            TextState("OK")
+                        }
+                    } message: {
+                        TextState("ElevenLabs API key saved successfully")
+                    }
+                    return .send(.delegate(.apiKeyChanged))
+                } else {
+                    state.alert = AlertState {
+                        TextState("Error")
+                    } actions: {
+                        ButtonState(role: .cancel) {
+                            TextState("OK")
+                        }
+                    } message: {
+                        TextState("Failed to save ElevenLabs API key. Please try again.")
+                    }
+                }
+                return .none
+
+            case .clearElevenLabsButtonTapped:
+                if apiKeyManager.deleteElevenLabsAPIKey() {
+                    state.elevenLabsAPIKeyInput = ""
+                    state.hasValidElevenLabsAPIKey = false
+                    state.currentMaskedElevenLabsKey = ""
+                    state.alert = AlertState {
+                        TextState("Success")
+                    } actions: {
+                        ButtonState(role: .cancel) {
+                            TextState("OK")
+                        }
+                    } message: {
+                        TextState("ElevenLabs API key cleared successfully")
+                    }
+                    return .send(.delegate(.apiKeyChanged))
+                }
+                return .none
+
+            case .toggleElevenLabsVisibilityButtonTapped:
+                state.isElevenLabsAPIKeyVisible.toggle()
                 return .none
                 
             case .alert:

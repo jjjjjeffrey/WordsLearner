@@ -203,6 +203,35 @@ struct APIKeyManagerClient: Sendable {
     var saveAPIKey: @Sendable (String) -> Bool
     var deleteAPIKey: @Sendable () -> Bool
     var validateAPIKey: @Sendable (String) -> Bool
+    var hasValidElevenLabsAPIKey: @Sendable () -> Bool
+    var getElevenLabsAPIKey: @Sendable () -> String
+    var saveElevenLabsAPIKey: @Sendable (String) -> Bool
+    var deleteElevenLabsAPIKey: @Sendable () -> Bool
+    var validateElevenLabsAPIKey: @Sendable (String) -> Bool
+
+    init(
+        hasValidAPIKey: @escaping @Sendable () -> Bool,
+        getAPIKey: @escaping @Sendable () -> String,
+        saveAPIKey: @escaping @Sendable (String) -> Bool,
+        deleteAPIKey: @escaping @Sendable () -> Bool,
+        validateAPIKey: @escaping @Sendable (String) -> Bool,
+        hasValidElevenLabsAPIKey: @escaping @Sendable () -> Bool = { false },
+        getElevenLabsAPIKey: @escaping @Sendable () -> String = { "" },
+        saveElevenLabsAPIKey: @escaping @Sendable (String) -> Bool = { _ in false },
+        deleteElevenLabsAPIKey: @escaping @Sendable () -> Bool = { false },
+        validateElevenLabsAPIKey: @escaping @Sendable (String) -> Bool = { _ in false }
+    ) {
+        self.hasValidAPIKey = hasValidAPIKey
+        self.getAPIKey = getAPIKey
+        self.saveAPIKey = saveAPIKey
+        self.deleteAPIKey = deleteAPIKey
+        self.validateAPIKey = validateAPIKey
+        self.hasValidElevenLabsAPIKey = hasValidElevenLabsAPIKey
+        self.getElevenLabsAPIKey = getElevenLabsAPIKey
+        self.saveElevenLabsAPIKey = saveElevenLabsAPIKey
+        self.deleteElevenLabsAPIKey = deleteElevenLabsAPIKey
+        self.validateElevenLabsAPIKey = validateElevenLabsAPIKey
+    }
 }
 
 extension APIKeyManagerClient: DependencyKey {
@@ -222,6 +251,21 @@ extension APIKeyManagerClient: DependencyKey {
         },
         validateAPIKey: { key in
             MainActor.assumeIsolated { APIKeyManager.shared.validateAPIKey(key) }
+        },
+        hasValidElevenLabsAPIKey: {
+            MainActor.assumeIsolated { !APIKeyManager.shared.getElevenLabsAPIKey().isEmpty }
+        },
+        getElevenLabsAPIKey: {
+            MainActor.assumeIsolated { APIKeyManager.shared.getElevenLabsAPIKey() }
+        },
+        saveElevenLabsAPIKey: { key in
+            MainActor.assumeIsolated { APIKeyManager.shared.saveElevenLabsAPIKey(key) }
+        },
+        deleteElevenLabsAPIKey: {
+            MainActor.assumeIsolated { APIKeyManager.shared.deleteElevenLabsAPIKey() }
+        },
+        validateElevenLabsAPIKey: { key in
+            MainActor.assumeIsolated { APIKeyManager.shared.validateElevenLabsAPIKey(key) }
         }
     )
     
@@ -230,7 +274,12 @@ extension APIKeyManagerClient: DependencyKey {
         getAPIKey: { "test-api-key" },
         saveAPIKey: { _ in true },
         deleteAPIKey: { true },
-        validateAPIKey: { _ in true }
+        validateAPIKey: { _ in true },
+        hasValidElevenLabsAPIKey: { true },
+        getElevenLabsAPIKey: { "test-elevenlabs-api-key-1234567890" },
+        saveElevenLabsAPIKey: { _ in true },
+        deleteElevenLabsAPIKey: { true },
+        validateElevenLabsAPIKey: { _ in true }
     )
     
     static let testNoValidAPIKeyValue: Self = Self(
@@ -238,7 +287,12 @@ extension APIKeyManagerClient: DependencyKey {
         getAPIKey: { "" },
         saveAPIKey: { _ in false },
         deleteAPIKey: { false },
-        validateAPIKey: { _ in false }
+        validateAPIKey: { _ in false },
+        hasValidElevenLabsAPIKey: { false },
+        getElevenLabsAPIKey: { "" },
+        saveElevenLabsAPIKey: { _ in false },
+        deleteElevenLabsAPIKey: { false },
+        validateElevenLabsAPIKey: { _ in false }
     )
 }
 
