@@ -103,6 +103,19 @@ struct WordComparatorMainView: View {
                                 .padding(.vertical, 2)
                                 .background(Capsule().fill(AppColors.secondary))
                                 .foregroundStyle(.white)
+                        } else if item == .multimodalLessons && store.isGeneratingMultimodalLesson {
+                            if let progress = store.multimodalGenerationProgressFraction {
+                                Text("\(Int(progress * 100))%")
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(AppColors.warning))
+                                    .foregroundStyle(.white)
+                            } else {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
                         }
                     }
                 }
@@ -155,7 +168,12 @@ struct WordComparatorMainView: View {
             }
         case .multimodalLessons:
             if let multimodalStore = store.scope(state: \.multimodalLessons, action: \.multimodalLessons) {
-                MultimodalLessonsView(store: multimodalStore)
+                MultimodalLessonsView(
+                    store: multimodalStore,
+                    generationStatus: store.multimodalGenerationStatusText,
+                    generationProgress: store.multimodalGenerationProgressFraction,
+                    generatingLessonID: store.activeMultimodalLessonID
+                )
             } else {
                 Text("Select Multimodal Lessons from sidebar")
                     .foregroundStyle(.secondary)

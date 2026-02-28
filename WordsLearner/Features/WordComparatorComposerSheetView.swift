@@ -198,6 +198,35 @@ struct WordComparatorComposerSheetView: View {
                 .foregroundColor(canGenerateMultimodal ? .white : .gray)
             }
             .disabled(!canGenerateMultimodal)
+
+            if store.isGeneratingMultimodalLesson {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(store.multimodalGenerationStatusText ?? "Generating multimodal lesson...")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(AppColors.primaryText)
+
+                    if let progress = store.multimodalGenerationProgressFraction {
+                        ProgressView(value: progress, total: 1.0)
+                            .tint(AppColors.secondary)
+                    } else {
+                        ProgressView()
+                            .tint(AppColors.secondary)
+                    }
+
+                    if let stepText = store.multimodalGenerationStepText {
+                        Text("Progress: \(stepText)")
+                            .font(.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(AppColors.secondaryBackground)
+                )
+            }
         }
     }
 

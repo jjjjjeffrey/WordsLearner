@@ -9,14 +9,14 @@ import ImageIO
 
 @DependencyClient
 struct MultimodalImageGeneratorClient: Sendable {
-    var generateImage: @Sendable (_ prompt: String) async throws -> Data
+    var generateImage: @Sendable (_ prompt: String, _ referenceImages: [Data]) async throws -> Data
 }
 
 extension MultimodalImageGeneratorClient: DependencyKey {
     static var liveValue: Self {
         @Dependency(\.apiKeyManager) var apiKeyManager
         return Self(
-            generateImage: { prompt in
+            generateImage: { prompt, referenceImages in
                 let apiKey = await MainActor.run {
                     apiKeyManager.getAPIKey()
                 }
@@ -31,29 +31,45 @@ extension MultimodalImageGeneratorClient: DependencyKey {
                 request.httpMethod = "POST"
                 request.addValue("application/json", forHTTPHeaderField: "Content-Type")
                 request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                let hasReferences = !referenceImages.isEmpty
                 var lastImageData: Data?
                 for attempt in 1...4 {
-                    let strictLine = attempt > 1 ? "- CRITICAL: Return a landscape 16:9 frame." : ""
+                    let strictAspectLine = attempt > 1 ? "- CRITICAL: Return a landscape 16:9 frame." : ""
+                    let strictSceneLine = attempt > 1 ? "- CRITICAL: Match the described story moment exactly. Do not invent unrelated scenes." : ""
+                    let strictContinuityLine = (attempt > 1 && hasReferences) ? "- CRITICAL: Keep the same characters and environment continuity from the attached reference image(s)." : ""
+                    let continuitySection = hasReferences ? """
+
+                    Continuity requirements:
+                    - Use attached reference image(s) from earlier frames as visual canon.
+                    - Keep character identity, outfit, proportions, and color palette consistent.
+                    - Keep environment continuity unless narration explicitly changes location.
+                    - Keep style and camera language consistent with the reference image(s).
+                    """ : ""
                     let refinedPrompt = """
                     \(prompt)
+
+                    Scene fidelity requirements:
+                    - Treat the provided story/frame details as ground truth.
+                    - Depict the exact described action, people, and setting.
+                    - Prefer concrete narrative details over generic symbolism.
+                    \(continuitySection)
 
                     Visual constraints:
                     - Cinematic storyboard frame
                     - Landscape 16:9 composition (video-like)
                     - Single clear moment, vivid and concrete
                     - No text, no subtitles, no letters, no watermark
-                    \(strictLine)
+                    \(strictAspectLine)
+                    \(strictSceneLine)
+                    \(strictContinuityLine)
                     """
 
+                    let parts = buildPromptParts(prompt: refinedPrompt, referenceImages: referenceImages)
                     let payloadWithAspect: [String: Any] = [
                         "contents": [
                             [
                                 "role": "user",
-                                "parts": [
-                                    [
-                                        "text": refinedPrompt
-                                    ]
-                                ],
+                                "parts": parts,
                             ]
                         ],
                         "generationConfig": [
@@ -67,11 +83,7 @@ extension MultimodalImageGeneratorClient: DependencyKey {
                         "contents": [
                             [
                                 "role": "user",
-                                "parts": [
-                                    [
-                                        "text": refinedPrompt
-                                    ]
-                                ],
+                                "parts": parts,
                             ]
                         ],
                         "generationConfig": [
@@ -102,7 +114,7 @@ extension MultimodalImageGeneratorClient: DependencyKey {
 
     static var previewValue: Self {
         Self(
-            generateImage: { _ in
+            generateImage: { _, _ in
                 Data()
             }
         )
@@ -159,6 +171,63 @@ private func requestImageData(
     }
 
     throw AIError.parsingError
+}
+
+private func buildPromptParts(prompt: String, referenceImages: [Data]) -> [[String: Any]] {
+    var parts: [[String: Any]] = [
+        [
+            "text": prompt
+        ]
+    ]
+
+    for imageData in referenceImages {
+        parts.append(
+            [
+                "inlineData": [
+                    "mimeType": imageMimeType(for: imageData),
+                    "data": imageData.base64EncodedString()
+                ]
+            ]
+        )
+    }
+
+    return parts
+}
+
+private func imageMimeType(for data: Data) -> String {
+    let bytes = [UInt8](data.prefix(12))
+    if bytes.count >= 8,
+       bytes[0] == 0x89,
+       bytes[1] == 0x50,
+       bytes[2] == 0x4E,
+       bytes[3] == 0x47 {
+        return "image/png"
+    }
+    if bytes.count >= 3,
+       bytes[0] == 0xFF,
+       bytes[1] == 0xD8,
+       bytes[2] == 0xFF {
+        return "image/jpeg"
+    }
+    if bytes.count >= 12,
+       bytes[0] == 0x52, // R
+       bytes[1] == 0x49, // I
+       bytes[2] == 0x46, // F
+       bytes[3] == 0x46, // F
+       bytes[8] == 0x57, // W
+       bytes[9] == 0x45, // E
+       bytes[10] == 0x42, // B
+       bytes[11] == 0x50 { // P
+        return "image/webp"
+    }
+    if bytes.count >= 4,
+       bytes[0] == 0x47, // G
+       bytes[1] == 0x49, // I
+       bytes[2] == 0x46, // F
+       bytes[3] == 0x38 { // 8
+        return "image/gif"
+    }
+    return "image/png"
 }
 
 private func isLandscape16x9(_ imageData: Data) -> Bool {

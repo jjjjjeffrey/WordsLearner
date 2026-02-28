@@ -50,6 +50,10 @@ struct WordComparatorFeature {
         var hasValidAPIKey: Bool = false
         var hasValidElevenLabsAPIKey: Bool = false
         var isGeneratingMultimodalLesson: Bool = false
+        var activeMultimodalLessonID: UUID?
+        var multimodalGenerationStatusText: String?
+        var multimodalGenerationStep: Int = 0
+        var multimodalGenerationTotalSteps: Int = 0
         
         // For observing background tasks in the main view
         @ObservationStateIgnored
@@ -80,6 +84,17 @@ struct WordComparatorFeature {
         var pendingTasksCount: Int {
             pendingTasks.count
         }
+
+        var multimodalGenerationProgressFraction: Double? {
+            guard multimodalGenerationTotalSteps > 0 else { return nil }
+            let clamped = min(max(multimodalGenerationStep, 0), multimodalGenerationTotalSteps)
+            return Double(clamped) / Double(multimodalGenerationTotalSteps)
+        }
+
+        var multimodalGenerationStepText: String? {
+            guard multimodalGenerationTotalSteps > 0 else { return nil }
+            return "\(multimodalGenerationStep)/\(multimodalGenerationTotalSteps)"
+        }
     }
     
     enum Action: BindableAction {
@@ -90,6 +105,7 @@ struct WordComparatorFeature {
         case generateButtonTapped
         case generateMultimodalButtonTapped
         case generateInBackgroundButtonTapped
+        case multimodalGenerationProgressUpdated(MultimodalGenerationProgress)
         case multimodalLessonGenerated(UUID)
         case multimodalLessonGenerationFailed(String)
         case settingsButtonTapped
@@ -217,6 +233,10 @@ struct WordComparatorFeature {
                 let word2 = state.word2
                 let sentence = state.sentence.trimmingCharacters(in: .whitespacesAndNewlines)
                 state.isGeneratingMultimodalLesson = true
+                state.activeMultimodalLessonID = nil
+                state.multimodalGenerationStatusText = "Starting multimodal lesson..."
+                state.multimodalGenerationStep = 0
+                state.multimodalGenerationTotalSteps = 0
                 state.isComposerSheetPresented = false
                 state.sidebarSelection = .multimodalLessons
                 activateSelection(&state)
@@ -227,14 +247,40 @@ struct WordComparatorFeature {
                             word1,
                             word2,
                             sentence.isEmpty ? nil : sentence
-                        ) { _ in }
+                        ) { progress in
+                            await send(.multimodalGenerationProgressUpdated(progress))
+                        }
                         await send(.multimodalLessonGenerated(lessonID))
                         await send(.clearInputFields)
                     } catch {
                         await send(.multimodalLessonGenerationFailed(error.localizedDescription))
                     }
                 }
-                
+
+            case let .multimodalGenerationProgressUpdated(progress):
+                switch progress {
+                case let .planning(lessonID):
+                    state.activeMultimodalLessonID = lessonID
+                    state.multimodalGenerationStatusText = "Planning storyboard..."
+                    state.multimodalGenerationStep = 0
+                    state.multimodalGenerationTotalSteps = 0
+                    if state.sidebarSelection == .multimodalLessons {
+                        return .send(.multimodalLessons(.lessonTapped(lessonID)))
+                    }
+                    return .none
+
+                case let .generatingFrame(lessonID, step, totalSteps, _):
+                    state.activeMultimodalLessonID = lessonID
+                    state.multimodalGenerationStep = step
+                    state.multimodalGenerationTotalSteps = totalSteps
+                    state.multimodalGenerationStatusText = "Generating scene \(step)/\(totalSteps)..."
+                    return .none
+
+                case .completed:
+                    state.multimodalGenerationStatusText = "Finalizing lesson..."
+                    return .none
+                }
+
             case .generateInBackgroundButtonTapped:
                 guard state.canGenerate && state.hasValidAPIKey else { return .none }
                 
@@ -258,12 +304,20 @@ struct WordComparatorFeature {
 
             case let .multimodalLessonGenerated(lessonID):
                 state.isGeneratingMultimodalLesson = false
+                state.activeMultimodalLessonID = nil
+                state.multimodalGenerationStatusText = nil
+                state.multimodalGenerationStep = 0
+                state.multimodalGenerationTotalSteps = 0
                 state.sidebarSelection = .multimodalLessons
                 activateSelection(&state)
                 return .send(.multimodalLessons(.lessonTapped(lessonID)))
 
             case let .multimodalLessonGenerationFailed(errorMessage):
                 state.isGeneratingMultimodalLesson = false
+                state.activeMultimodalLessonID = nil
+                state.multimodalGenerationStatusText = nil
+                state.multimodalGenerationStep = 0
+                state.multimodalGenerationTotalSteps = 0
                 state.alert = AlertState {
                     TextState("Multimodal Generation Failed")
                 } actions: {

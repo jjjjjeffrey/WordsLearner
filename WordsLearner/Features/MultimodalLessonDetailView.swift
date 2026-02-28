@@ -108,15 +108,33 @@ struct MultimodalLessonDetailView: View {
             }
 
             if orderedFrames.isEmpty {
-                Text("No frames found for this lesson.")
-                    .font(.caption)
-                    .foregroundColor(AppColors.secondaryText)
+                if selectedLesson?.lessonStatus == .generating {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Generating storyboard and narration...")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(AppColors.primaryText)
+                        }
+                        Text("This lesson is still in progress. New frames will appear automatically.")
+                            .font(.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                } else {
+                    Text("No frames found for this lesson.")
+                        .font(.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
             } else if let frame = currentFrame {
+                let descriptor = describeFrameRole(frame.frameRole)
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Frame \(frame.frameIndex + 1): \(frame.title)")
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundColor(AppColors.primaryText)
+                    frameRolePills(frame: frame, descriptor: descriptor)
                     frameImageView(frame)
                     Text(frame.narrationText)
                         .font(.title3)
@@ -150,11 +168,17 @@ struct MultimodalLessonDetailView: View {
 
     private var frameNavigationRow: some View {
         HStack {
+            Button("Previous") {
+                moveToPreviousFrame(loop: true)
+            }
+            .disabled(orderedFrames.count <= 1)
+
+            Spacer()
+
             Button("Next") {
                 moveToNextFrame(loop: true)
             }
             .disabled(orderedFrames.count <= 1)
-            Spacer()
         }
     }
 
@@ -217,8 +241,15 @@ struct MultimodalLessonDetailView: View {
     }
 
     private var frameProgressText: String {
-        guard !orderedFrames.isEmpty else { return "0/0" }
-        return "\(min(currentFramePosition + 1, orderedFrames.count))/\(orderedFrames.count)"
+        guard let frame = currentFrame else { return "0/0" }
+        let overall = "\(min(currentFramePosition + 1, orderedFrames.count))/\(orderedFrames.count)"
+        let descriptor = describeFrameRole(frame.frameRole)
+        if descriptor.isFinalConclusion {
+            return "\(overall) · Final Verdict"
+        }
+        guard let storyLabel = descriptor.storyLabel else { return overall }
+        guard let roleIndex = descriptor.roleIndexInStory else { return "\(overall) · \(storyLabel)" }
+        return "\(overall) · \(storyLabel) \(roleIndex + 1)/4"
     }
 
     private var canPlayAll: Bool {
@@ -284,6 +315,18 @@ struct MultimodalLessonDetailView: View {
         }
     }
 
+    private func moveToPreviousFrame(loop: Bool) {
+        guard !orderedFrames.isEmpty else { return }
+        if currentFramePosition > 0 {
+            currentFramePosition -= 1
+        } else if loop {
+            currentFramePosition = max(orderedFrames.count - 1, 0)
+        }
+        if audioPlayer.isPlaying {
+            stopPlayback()
+        }
+    }
+
     private func audioURL(for frame: MultimodalLessonFrame) -> URL? {
         try? assetStore.resolve(frame.audioRelativePath)
     }
@@ -326,6 +369,157 @@ struct MultimodalLessonDetailView: View {
         case .failed: return AppColors.error
         }
     }
+
+    @ViewBuilder
+    private func frameRolePills(frame: MultimodalLessonFrame, descriptor: FrameRoleDescriptor) -> some View {
+        HStack(spacing: 6) {
+            if let storyLabel = descriptor.storyLabel {
+                frameRolePill(storyLabel, tint: AppColors.info)
+            }
+            if let roleLabel = descriptor.roleLabel {
+                frameRolePill(roleLabel, tint: AppColors.secondaryText)
+            }
+            if descriptor.isFinalConclusion, let verdict = verdictLabel(for: frame.expectedAnswer) {
+                frameRolePill(verdict, tint: verdictColor(for: frame.expectedAnswer))
+            }
+            Spacer()
+        }
+    }
+
+    private func frameRolePill(_ text: String, tint: Color) -> some View {
+        Text(text)
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                Capsule()
+                    .fill(tint.opacity(0.15))
+            )
+            .foregroundColor(tint)
+    }
+
+    private func verdictLabel(for verdict: String?) -> String? {
+        switch verdict?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "yes":
+            return "Interchangeable"
+        case "no":
+            return "Not Interchangeable"
+        case "depends":
+            return "Depends"
+        default:
+            return nil
+        }
+    }
+
+    private func verdictColor(for verdict: String?) -> Color {
+        switch verdict?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "yes":
+            return AppColors.success
+        case "no":
+            return AppColors.error
+        case "depends":
+            return AppColors.warning
+        default:
+            return AppColors.secondaryText
+        }
+    }
+
+    private func describeFrameRole(_ frameRole: String) -> FrameRoleDescriptor {
+        let trimmed = frameRole.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = trimmed.lowercased()
+        if normalized == "final_conclusion" {
+            return FrameRoleDescriptor(
+                storyLabel: nil,
+                roleLabel: "Final Conclusion",
+                roleIndexInStory: nil,
+                isFinalConclusion: true
+            )
+        }
+
+        let parts = trimmed.split(separator: ":", maxSplits: 1).map(String.init)
+        if parts.count == 2 {
+            let storyID = parts[0]
+            let roleRaw = parts[1].lowercased()
+            return FrameRoleDescriptor(
+                storyLabel: storyLabel(for: storyID),
+                roleLabel: roleLabel(for: roleRaw),
+                roleIndexInStory: roleIndex(for: roleRaw),
+                isFinalConclusion: false
+            )
+        }
+
+        guard !trimmed.isEmpty else {
+            return FrameRoleDescriptor(
+                storyLabel: nil,
+                roleLabel: nil,
+                roleIndexInStory: nil,
+                isFinalConclusion: false
+            )
+        }
+
+        return FrameRoleDescriptor(
+            storyLabel: nil,
+            roleLabel: humanizedRole(trimmed),
+            roleIndexInStory: nil,
+            isFinalConclusion: false
+        )
+    }
+
+    private func storyLabel(for storyID: String) -> String {
+        guard storyID.lowercased().hasPrefix("story_") else {
+            return humanizedRole(storyID)
+        }
+        let suffix = String(storyID.dropFirst("story_".count))
+        guard !suffix.isEmpty else { return "Story" }
+        return "Story \(suffix.uppercased())"
+    }
+
+    private func roleLabel(for roleRaw: String) -> String {
+        switch roleRaw {
+        case "setup":
+            return "Setup"
+        case "conflict":
+            return "Conflict"
+        case "outcome":
+            return "Outcome"
+        case "language_lock_in":
+            return "Language Lock-In"
+        default:
+            return humanizedRole(roleRaw)
+        }
+    }
+
+    private func roleIndex(for roleRaw: String) -> Int? {
+        switch roleRaw {
+        case "setup":
+            return 0
+        case "conflict":
+            return 1
+        case "outcome":
+            return 2
+        case "language_lock_in":
+            return 3
+        default:
+            return nil
+        }
+    }
+
+    private func humanizedRole(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .split(separator: " ")
+            .map { $0.capitalized }
+            .joined(separator: " ")
+    }
+}
+
+private struct FrameRoleDescriptor {
+    let storyLabel: String?
+    let roleLabel: String?
+    let roleIndexInStory: Int?
+    let isFinalConclusion: Bool
 }
 
 @MainActor

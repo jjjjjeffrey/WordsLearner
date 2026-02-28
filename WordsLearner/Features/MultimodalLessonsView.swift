@@ -9,9 +9,29 @@ import SwiftUI
 
 struct MultimodalLessonsView: View {
     @Bindable var store: StoreOf<MultimodalLessonsFeature>
+    let generationStatus: String?
+    let generationProgress: Double?
+    let generatingLessonID: UUID?
+
+    init(
+        store: StoreOf<MultimodalLessonsFeature>,
+        generationStatus: String? = nil,
+        generationProgress: Double? = nil,
+        generatingLessonID: UUID? = nil
+    ) {
+        self.store = store
+        self.generationStatus = generationStatus
+        self.generationProgress = generationProgress
+        self.generatingLessonID = generatingLessonID
+    }
 
     var body: some View {
-        Group {
+        VStack(spacing: 0) {
+            if let generationStatus {
+                generationBanner(generationStatus)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+            }
             listContent
         }
         .navigationTitle("Multimodal History")
@@ -122,6 +142,25 @@ struct MultimodalLessonsView: View {
                     .font(.caption)
                     .foregroundColor(AppColors.secondaryText)
                     .lineLimit(2)
+
+                if lesson.lessonStatus == .generating {
+                    if lesson.id == generatingLessonID {
+                        Text(generationStatus ?? "Generating storyboard and narration...")
+                            .font(.caption2)
+                            .foregroundColor(AppColors.warning)
+                        if let generationProgress {
+                            ProgressView(value: generationProgress, total: 1.0)
+                                .tint(AppColors.warning)
+                        } else {
+                            ProgressView()
+                                .tint(AppColors.warning)
+                        }
+                    } else {
+                        Text("Generating lesson assets...")
+                            .font(.caption2)
+                            .foregroundColor(AppColors.warning)
+                    }
+                }
                 if store.selectedLessonID == lesson.id {
                     Text("Selected. View details in the detail column.")
                         .font(.caption2)
@@ -141,6 +180,29 @@ struct MultimodalLessonsView: View {
             .padding(.vertical, 2)
         }
         .buttonStyle(.plain)
+    }
+
+    private func generationBanner(_ status: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text(status)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(AppColors.primaryText)
+                Spacer()
+            }
+            if let generationProgress {
+                ProgressView(value: generationProgress, total: 1.0)
+                    .tint(AppColors.warning)
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(AppColors.secondaryBackground)
+        )
     }
 
     private func statusBadge(_ status: MultimodalLesson.Status) -> some View {
