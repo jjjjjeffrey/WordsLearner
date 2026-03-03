@@ -47,7 +47,7 @@ struct DependencyPreviewIntegrationTests {
             #expect(actual.contains("Character"))
             #expect(actual == expected)
 
-            try await generator.saveToHistory("character", "characteristic", "test", streamed)
+            _ = try await generator.saveToHistory("character", "characteristic", "test", streamed)
 
             let rows = try await database.read { db in
                 try ComparisonHistory
@@ -134,8 +134,8 @@ struct DependencyPreviewIntegrationTests {
             @Dependency(\.defaultDatabase) var database
 
             let generator = ComparisonGenerationServiceClient.previewValue
-            try await generator.saveToHistory("accept", "except", "first", "response-1")
-            try await generator.saveToHistory("accept", "except", "second", "response-2")
+            _ = try await generator.saveToHistory("accept", "except", "first", "response-1")
+            _ = try await generator.saveToHistory("accept", "except", "second", "response-2")
 
             let rows = try await database.read { db in
                 try ComparisonHistory

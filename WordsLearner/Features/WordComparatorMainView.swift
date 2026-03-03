@@ -78,14 +78,6 @@ struct WordComparatorMainView: View {
             }
             #endif
         }
-        #if os(iOS)
-        .onChange(of: preferredCompactColumn) { _, compactColumn in
-            guard horizontalSizeClass == .compact else { return }
-            if compactColumn != .detail, store.detail != nil {
-                store.send(.detailDismissed)
-            }
-        }
-        #endif
     }
 
     private var sidebarView: some View {
@@ -164,29 +156,24 @@ struct WordComparatorMainView: View {
 
     @ViewBuilder
     private var detailColumn: some View {
-        if let detailStore = store.scope(state: \.detail, action: \.detail) {
-            ResponseDetailView(store: detailStore)
-                #if os(iOS)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        newComparisonIconButton
-                    }
-                }
-                #endif
-        } else {
-            ContentUnavailableView(
-                "No Comparison Selected",
-                systemImage: "text.bubble",
-                description: Text("Choose a comparison to view details.")
-            )
-            #if os(iOS)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    newComparisonIconButton
-                }
+        NavigationStack {
+            if let detailStore = store.scope(state: \.detail, action: \.detail) {
+                ResponseDetailView(store: detailStore)
+            } else {
+                ContentUnavailableView(
+                    "No Comparison Selected",
+                    systemImage: "text.bubble",
+                    description: Text("Choose a comparison to view details.")
+                )
             }
-            #endif
         }
+        #if os(iOS)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                newComparisonIconButton
+            }
+        }
+        #endif
     }
 
     private var settingsButton: some View {

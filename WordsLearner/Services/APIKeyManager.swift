@@ -14,7 +14,8 @@ class APIKeyManager: ObservableObject {
     @Published var hasValidAPIKey: Bool = false
     
     private let service = "EnglishWordComparatorApp"
-    private let account = "aihubmix-api-key"
+    private let aihubmixAccount = "aihubmix-api-key"
+    private let elevenLabsAccount = "elevenlabs-api-key"
     
     static let shared: APIKeyManager = .init()
     
@@ -23,21 +24,7 @@ class APIKeyManager: ObservableObject {
     }
     
     func saveAPIKey(_ key: String) -> Bool {
-        let keyData = key.data(using: .utf8)!
-        
-        // Delete any existing key first
-        deleteAPIKey()
-        
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: keyData,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        ]
-        
-        let status = SecItemAdd(query as CFDictionary, nil)
-        let success = status == errSecSuccess
+        let success = saveKey(key, account: aihubmixAccount)
         
         if success {
             hasValidAPIKey = !key.isEmpty
@@ -47,35 +34,11 @@ class APIKeyManager: ObservableObject {
     }
     
     func getAPIKey() -> String {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: kCFBooleanTrue!,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        if status == errSecSuccess,
-           let data = result as? Data,
-           let apiKey = String(data: data, encoding: .utf8) {
-            return apiKey
-        }
-        
-        return ""
+        getKey(account: aihubmixAccount)
     }
     
     func deleteAPIKey() -> Bool {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-        
-        let status = SecItemDelete(query as CFDictionary)
-        let success = status == errSecSuccess || status == errSecItemNotFound
+        let success = deleteKey(account: aihubmixAccount)
         
         if success {
             hasValidAPIKey = false
@@ -83,11 +46,74 @@ class APIKeyManager: ObservableObject {
         
         return success
     }
-    
+
+    func saveElevenLabsAPIKey(_ key: String) -> Bool {
+        saveKey(key, account: elevenLabsAccount)
+    }
+
+    func getElevenLabsAPIKey() -> String {
+        getKey(account: elevenLabsAccount)
+    }
+
+    func deleteElevenLabsAPIKey() -> Bool {
+        deleteKey(account: elevenLabsAccount)
+    }
+
+    func validateElevenLabsAPIKey(_ key: String) -> Bool {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && !trimmed.contains(" ") && trimmed.count >= 20
+    }
+
     func validateAPIKey(_ key: String) -> Bool {
-        // Basic validation - you can make this more sophisticated
-        return !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-               key.count > 10 && // Reasonable minimum length
-               !key.contains(" ") // API keys typically don't have spaces
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed.count > 10 && !trimmed.contains(" ")
+    }
+
+    private func saveKey(_ key: String, account: String) -> Bool {
+        let keyData = key.data(using: .utf8)!
+        _ = deleteKey(account: account)
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecValueData as String: keyData,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        ]
+
+        let status = SecItemAdd(query as CFDictionary, nil)
+        return status == errSecSuccess
+    }
+
+    private func getKey(account: String) -> String {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: kCFBooleanTrue!,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        if status == errSecSuccess,
+           let data = result as? Data,
+           let key = String(data: data, encoding: .utf8) {
+            return key
+        }
+
+        return ""
+    }
+
+    private func deleteKey(account: String) -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
     }
 }

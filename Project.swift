@@ -91,7 +91,8 @@ let appSettings: Settings = .settings(
         .debug(
             name: "Debug",
             settings: [
-                "PRODUCT_BUNDLE_IDENTIFIER": "com.jeffrey.wordslearner.debug"
+                "PRODUCT_BUNDLE_IDENTIFIER": "com.jeffrey.wordslearner.debug",
+                "CODE_SIGN_ENTITLEMENTS": "WordsLearner/WordsLearner.Debug.entitlements"
             ]
         ),
         .release(

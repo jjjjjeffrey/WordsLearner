@@ -16,12 +16,24 @@ struct ResponseDetailFeature {
         let word1: String
         let word2: String
         let sentence: String
+        var comparisonID: UUID? = nil
         var streamingResponse: String = ""
         var attributedString: AttributedString = AttributedString()
         var scrollToBottomId: Int = 0
         var isStreaming: Bool = false
         var errorMessage: String? = nil
         var shouldStartStreaming: Bool = true
+        var audioRelativePath: String? = nil
+        var audioDurationSeconds: Double? = nil
+        var isGeneratingAudio: Bool = false
+        var audioGenerationProgress: Double = 0
+        var audioGenerationStatusMessage: String? = nil
+        var audioErrorMessage: String? = nil
+        var shouldAutoPlayAfterAudioReady: Bool = false
+        var podcastTranscript: String = ""
+        var isGeneratingPodcastTranscript: Bool = false
+        var podcastTranscriptErrorMessage: String? = nil
+        @Presents var markdownDetail: MarkdownDetailFeature.State?
     }
     
     enum Action: Equatable {
@@ -33,11 +45,24 @@ struct ResponseDetailFeature {
         case attributedStringRendered(AttributedString)
         case streamFailed(String)
         case shareButtonTapped
-        case comparisonSaved
+        case comparisonSaved(UUID)
         case comparisonSaveFailed(String)
+        case generateAudioButtonTapped
+        case audioGenerationProgressUpdated(Double, String)
+        case audioGenerationSucceeded(ComparisonAudioMetadata)
+        case audioGenerationFailed(String)
+        case audioPlaybackToggled
+        case audioPlaybackStopped
+        case generatePodcastTranscriptButtonTapped
+        case podcastTranscriptSucceeded(String)
+        case podcastTranscriptFailed(String)
+        case markdownDetailButtonTapped
+        case markdownDetail(PresentationAction<MarkdownDetailFeature.Action>)
     }
     
     @Dependency(\.comparisonGenerator) var generator
+    @Dependency(\.comparisonAudioService) var comparisonAudioService
+    @Dependency(ComparisonPodcastTranscriptClient.self) var comparisonPodcastTranscript
     @Dependency(\.platformShare) var platformShare
     
     var body: some Reducer<State, Action> {
@@ -66,6 +91,8 @@ struct ResponseDetailFeature {
                 state.isStreaming = true
                 state.shouldStartStreaming = false
                 state.errorMessage = nil
+                state.podcastTranscript = ""
+                state.podcastTranscriptErrorMessage = nil
                 
                 return .run { [generator, word1 = state.word1, word2 = state.word2, sentence = state.sentence] send in
                     do {
@@ -80,6 +107,10 @@ struct ResponseDetailFeature {
                 
             case let .streamChunkReceived(chunk):
                 state.streamingResponse += chunk
+                if var markdownDetail = state.markdownDetail {
+                    markdownDetail.markdown = state.streamingResponse
+                    state.markdownDetail = markdownDetail
+                }
                 return .run { [ streamingResponse = state.streamingResponse ] send in
                     let processed = await AttributedStringRenderer.renderMarkdown(streamingResponse)
                     await send(.attributedStringRendered(processed))
@@ -87,24 +118,29 @@ struct ResponseDetailFeature {
             case let .attributedStringRendered(attributedString):
                 state.attributedString = attributedString
                 if state.isStreaming { state.scrollToBottomId+=1 }
+                if var markdownDetail = state.markdownDetail {
+                    markdownDetail.attributedString = attributedString
+                    state.markdownDetail = markdownDetail
+                }
                 return .none
             case .streamCompleted:
                 state.isStreaming = false
                 return .run { [generator, word1 = state.word1, word2 = state.word2, sentence = state.sentence, response = state.streamingResponse] send in
                     do {
-                        try await generator.saveToHistory(
+                        let id = try await generator.saveToHistory(
                             word1,
                             word2,
                             sentence,
                             response
                         )
-                        await send(.comparisonSaved)
+                        await send(.comparisonSaved(id))
                     } catch {
                         await send(.comparisonSaveFailed(error.localizedDescription))
                     }
                 }
                 
-            case .comparisonSaved:
+            case let .comparisonSaved(id):
+                state.comparisonID = id
                 return .none
                 
             case let .comparisonSaveFailed(errorMessage):
@@ -115,7 +151,114 @@ struct ResponseDetailFeature {
                 state.isStreaming = false
                 state.errorMessage = errorMessage
                 return .none
-                
+
+            case .generateAudioButtonTapped:
+                guard
+                    let comparisonID = state.comparisonID,
+                    !state.streamingResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    !state.isGeneratingAudio
+                else {
+                    return .none
+                }
+                state.isGeneratingAudio = true
+                state.isGeneratingPodcastTranscript = true
+                state.audioGenerationProgress = 0.05
+                state.audioGenerationStatusMessage = "Generating podcast transcript..."
+                state.audioErrorMessage = nil
+                state.podcastTranscriptErrorMessage = nil
+                state.shouldAutoPlayAfterAudioReady = false
+                return .run {
+                    [
+                        comparisonAudioService,
+                        comparisonPodcastTranscript,
+                        markdown = state.streamingResponse
+                    ] send in
+                    do {
+                        await send(.audioGenerationProgressUpdated(0.2, "Generating podcast transcript..."))
+                        let transcript = try await comparisonPodcastTranscript.generateTranscript(markdown)
+                        await send(.podcastTranscriptSucceeded(transcript))
+                        await send(.audioGenerationProgressUpdated(0.6, "Generating audio..."))
+                        let metadata = try await comparisonAudioService.generateAndAttach(comparisonID, transcript)
+                        await send(.audioGenerationSucceeded(metadata))
+                    } catch {
+                        await send(.audioGenerationFailed(error.localizedDescription))
+                    }
+                }
+
+            case let .audioGenerationProgressUpdated(progress, message):
+                state.audioGenerationProgress = max(0, min(1, progress))
+                state.audioGenerationStatusMessage = message
+                return .none
+
+            case let .audioGenerationSucceeded(metadata):
+                state.isGeneratingAudio = false
+                state.isGeneratingPodcastTranscript = false
+                state.audioGenerationProgress = 1
+                state.audioGenerationStatusMessage = "Completed"
+                state.audioRelativePath = metadata.relativePath
+                state.audioDurationSeconds = metadata.durationSeconds
+                state.audioErrorMessage = nil
+                state.shouldAutoPlayAfterAudioReady = true
+                return .none
+
+            case let .audioGenerationFailed(message):
+                state.isGeneratingAudio = false
+                state.isGeneratingPodcastTranscript = false
+                state.audioGenerationProgress = 0
+                state.audioGenerationStatusMessage = nil
+                state.audioErrorMessage = message
+                return .none
+
+            case .audioPlaybackToggled:
+                state.shouldAutoPlayAfterAudioReady = false
+                return .none
+
+            case .audioPlaybackStopped:
+                state.shouldAutoPlayAfterAudioReady = false
+                return .none
+
+            case .generatePodcastTranscriptButtonTapped:
+                guard
+                    !state.streamingResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    !state.isGeneratingPodcastTranscript
+                else {
+                    return .none
+                }
+                state.isGeneratingPodcastTranscript = true
+                state.podcastTranscriptErrorMessage = nil
+                return .run { [comparisonPodcastTranscript, markdown = state.streamingResponse] send in
+                    do {
+                        let transcript = try await comparisonPodcastTranscript.generateTranscript(markdown)
+                        await send(.podcastTranscriptSucceeded(transcript))
+                    } catch {
+                        await send(.podcastTranscriptFailed(error.localizedDescription))
+                    }
+                }
+
+            case let .podcastTranscriptSucceeded(transcript):
+                state.isGeneratingPodcastTranscript = false
+                state.podcastTranscript = transcript
+                state.podcastTranscriptErrorMessage = nil
+                return .none
+
+            case let .podcastTranscriptFailed(message):
+                state.isGeneratingPodcastTranscript = false
+                state.podcastTranscriptErrorMessage = message
+                return .none
+
+            case .markdownDetailButtonTapped:
+                guard !state.streamingResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    return .none
+                }
+                state.markdownDetail = MarkdownDetailFeature.State(
+                    markdown: state.streamingResponse,
+                    attributedString: state.attributedString
+                )
+                return .none
+
+            case .markdownDetail:
+                return .none
+
             case .shareButtonTapped:
                 let shareText = """
                 Word Comparison: \(state.word1) vs \(state.word2)
@@ -129,6 +272,9 @@ struct ResponseDetailFeature {
                 platformShare.share(shareText)
                 return .none
             }
+        }
+        .ifLet(\.$markdownDetail, action: \.markdownDetail) {
+            MarkdownDetailFeature()
         }
     }
 }

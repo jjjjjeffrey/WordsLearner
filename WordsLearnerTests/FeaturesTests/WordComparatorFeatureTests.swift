@@ -64,6 +64,28 @@ struct WordComparatorFeatureTests {
             )
         }
     }
+
+    private func seedComparisonHistoryWithAudio(id: UUID, in db: Database) throws {
+        try db.seed {
+            ComparisonHistory.Draft(
+                id: id,
+                word1: "alpha",
+                word2: "beta",
+                sentence: "alpha and beta",
+                response: "Saved response",
+                date: seedBaseDate,
+                isRead: true,
+                audioRelativePath: "ComparisonAudio/\(id.uuidString).m4a",
+                podcastTranscript: "Alex (Male): A\nMia (Female): B",
+                audioFileExtension: "m4a",
+                audioData: Data("audio".utf8),
+                audioDurationSeconds: 12.34,
+                audioGeneratedAt: seedBaseDate,
+                audioVoiceID: "male+female",
+                audioModel: "eleven_multilingual_v2"
+            )
+        }
+    }
     
     @Test
     func canGenerateWithEmptyAndValidInputs() async {
@@ -203,8 +225,55 @@ struct WordComparatorFeatureTests {
                 word1: "alpha",
                 word2: "beta",
                 sentence: "alpha and beta",
+                comparisonID: id,
                 streamingResponse: "Saved response",
                 shouldStartStreaming: false
+            )
+            $0.detailPresentationToken = 1
+        }
+        await store.receive(\.detail.hydrateStoredResponse)
+        await store.receive(\.detail.attributedStringRendered) {
+            $0.detail?.attributedString = rendered
+        }
+    }
+
+    @Test
+    func onAppearRestoresLastReadComparisonDetailWithAudioMetadata() async {
+        let id = UUID()
+        let box = LastReadStoreBox()
+        box.set(id.uuidString)
+        let store = TestStore(initialState: WordComparatorFeature.State()) {
+            WordComparatorFeature()
+        } withDependencies: {
+            $0.apiKeyManager = .testValue
+            $0.lastReadComparisonStore = .init(
+                get: { box.get() },
+                set: { box.set($0) },
+                clear: { box.set(nil) }
+            )
+            try! $0.bootstrapDatabase(useTest: true, seed: { db in
+                try seedBackgroundTasks(in: db)
+                try seedComparisonHistoryWithAudio(id: id, in: db)
+            })
+        }
+
+        let rendered = await AttributedStringRenderer.renderMarkdown("Saved response")
+
+        await store.send(.onAppear) {
+            $0.hasValidAPIKey = true
+            $0.historyList = ComparisonHistoryListFeature.State()
+        }
+        await store.receive(\.lastReadComparisonLoaded) {
+            $0.detail = ResponseDetailFeature.State(
+                word1: "alpha",
+                word2: "beta",
+                sentence: "alpha and beta",
+                comparisonID: id,
+                streamingResponse: "Saved response",
+                shouldStartStreaming: false,
+                audioRelativePath: "ComparisonAudio/\(id.uuidString).m4a",
+                audioDurationSeconds: 12.34,
+                podcastTranscript: "Alex (Male): A\nMia (Female): B"
             )
             $0.detailPresentationToken = 1
         }
@@ -279,6 +348,7 @@ struct WordComparatorFeatureTests {
     
     @Test
     func generateButtonTappedWithValidInputs() async {
+        let savedID = UUID()
         let store = TestStore(initialState: WordComparatorFeature.State(
             word1: "word1",
             word2: "word2",
@@ -295,7 +365,7 @@ struct WordComparatorFeatureTests {
                         continuation.finish()
                     }
                 },
-                saveToHistory: { @Sendable _, _, _, _ async throws in }
+                saveToHistory: { @Sendable _, _, _, _ async throws in savedID }
             )
             try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
         }
@@ -323,11 +393,16 @@ struct WordComparatorFeatureTests {
         await store.receive(\.detail.streamCompleted) {
             $0.detail?.isStreaming = false
         }
-        await store.receive(\.detail.comparisonSaved)
+        await store.receive(\.detail.comparisonSaved) {
+            $0.detail?.comparisonID = savedID
+        }
     }
     
     @Test
     func generateButtonTappedTwiceStartsStreamingBothTimes() async {
+        let firstSavedID = UUID()
+        let secondSavedID = UUID()
+        let savedIDs = LockIsolated([firstSavedID, secondSavedID])
         let store = TestStore(initialState: WordComparatorFeature.State(
             word1: "accept",
             word2: "except",
@@ -343,7 +418,9 @@ struct WordComparatorFeatureTests {
                         continuation.finish()
                     }
                 },
-                saveToHistory: { @Sendable _, _, _, _ async throws in }
+                saveToHistory: { @Sendable _, _, _, _ async throws in
+                    savedIDs.withValue { $0.removeFirst() }
+                }
             )
             try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
         }
@@ -368,7 +445,9 @@ struct WordComparatorFeatureTests {
         await store.receive(\.detail.streamCompleted) {
             $0.detail?.isStreaming = false
         }
-        await store.receive(\.detail.comparisonSaved)
+        await store.receive(\.detail.comparisonSaved) {
+            $0.detail?.comparisonID = firstSavedID
+        }
 
         await store.send(\.binding.word1, "affect") {
             $0.word1 = "affect"
@@ -400,7 +479,9 @@ struct WordComparatorFeatureTests {
         await store.receive(\.detail.streamCompleted) {
             $0.detail?.isStreaming = false
         }
-        await store.receive(\.detail.comparisonSaved)
+        await store.receive(\.detail.comparisonSaved) {
+            $0.detail?.comparisonID = secondSavedID
+        }
     }
 
     @Test
@@ -578,6 +659,7 @@ struct WordComparatorFeatureTests {
                 word1: "word1",
                 word2: "word2",
                 sentence: "This is a sentence",
+                comparisonID: comparison.id,
                 streamingResponse: "Response text",
                 shouldStartStreaming: false
             )
@@ -620,8 +702,64 @@ struct WordComparatorFeatureTests {
                 word1: "word1",
                 word2: "word2",
                 sentence: "This is a sentence",
+                comparisonID: comparison.id,
                 streamingResponse: "Response text",
                 shouldStartStreaming: false
+            )
+            $0.detailPresentationToken = 1
+        }
+        await store.receive(\.detail.hydrateStoredResponse)
+        await store.receive(\.detail.attributedStringRendered) {
+            $0.detail?.attributedString = rendered
+        }
+    }
+
+    @Test
+    func pathHistoryListDelegateComparisonSelectedWithGeneratedPodcastAndAudio() async {
+        let comparison = ComparisonHistory(
+            id: UUID(),
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            response: "Response text",
+            date: Date(),
+            isRead: false,
+            audioRelativePath: "ComparisonAudio/generated.m4a",
+            podcastTranscript: """
+            Alex (Male): Podcast opening.
+            Mia (Female): Podcast continuation.
+            """,
+            audioFileExtension: "m4a",
+            audioData: Data("audio".utf8),
+            audioDurationSeconds: 11.2,
+            audioGeneratedAt: Date(),
+            audioVoiceID: "male+female",
+            audioModel: "eleven_multilingual_v2"
+        )
+
+        let store = TestStore(initialState: WordComparatorFeature.State()) {
+            WordComparatorFeature()
+        } withDependencies: {
+            $0.apiKeyManager = .testValue
+            try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
+        }
+        let rendered = await AttributedStringRenderer.renderMarkdown("Response text")
+
+        await store.send(.historyListButtonTapped) {
+            $0.sidebarSelection = .history
+            $0.historyList = ComparisonHistoryListFeature.State()
+        }
+        await store.send(.historyList(.delegate(.comparisonSelected(comparison)))) {
+            $0.detail = ResponseDetailFeature.State(
+                word1: comparison.word1,
+                word2: comparison.word2,
+                sentence: comparison.sentence,
+                comparisonID: comparison.id,
+                streamingResponse: comparison.response,
+                shouldStartStreaming: false,
+                audioRelativePath: comparison.audioRelativePath,
+                audioDurationSeconds: comparison.audioDurationSeconds,
+                podcastTranscript: comparison.podcastTranscript ?? ""
             )
             $0.detailPresentationToken = 1
         }
@@ -671,6 +809,7 @@ struct WordComparatorFeatureTests {
                 word1: first.word1,
                 word2: first.word2,
                 sentence: first.sentence,
+                comparisonID: first.id,
                 streamingResponse: first.response,
                 shouldStartStreaming: false
             )
@@ -690,6 +829,7 @@ struct WordComparatorFeatureTests {
                 word1: second.word1,
                 word2: second.word2,
                 sentence: second.sentence,
+                comparisonID: second.id,
                 streamingResponse: second.response,
                 shouldStartStreaming: false
             )
@@ -699,6 +839,57 @@ struct WordComparatorFeatureTests {
         await store.receive(\.detail.attributedStringRendered) {
             $0.detail?.attributedString = secondRendered
         }
+    }
+
+    @Test
+    func detailComparisonSavedUpdatesDetailComparisonID() async {
+        let store = TestStore(
+            initialState: WordComparatorFeature.State(
+                detail: ResponseDetailFeature.State(
+                    word1: "accept",
+                    word2: "except",
+                    sentence: "I accept all terms except this one.",
+                    streamingResponse: "Response",
+                    shouldStartStreaming: false
+                )
+            )
+        ) {
+            WordComparatorFeature()
+        } withDependencies: {
+            $0.apiKeyManager = .testValue
+            try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
+        }
+
+        let savedID = UUID()
+        await store.send(.detail(.comparisonSaved(savedID))) {
+            $0.detail?.comparisonID = savedID
+        }
+    }
+
+    @Test
+    func bindingSidebarSelectionNilDoesNotClearDetail() async {
+        let comparisonID = UUID()
+        let store = TestStore(
+            initialState: WordComparatorFeature.State(
+                sidebarSelection: .history,
+                historyList: ComparisonHistoryListFeature.State(),
+                detail: ResponseDetailFeature.State(
+                    word1: "alpha",
+                    word2: "beta",
+                    sentence: "alpha and beta",
+                    comparisonID: comparisonID,
+                    streamingResponse: "Saved response",
+                    shouldStartStreaming: false
+                )
+            )
+        ) {
+            WordComparatorFeature()
+        } withDependencies: {
+            $0.apiKeyManager = .testValue
+            try! $0.bootstrapDatabase(useTest: true, seed: seedBackgroundTasks(in:))
+        }
+
+        await store.send(\.binding.sidebarSelection, nil)
     }
     
     // MARK: - Binding Actions Tests

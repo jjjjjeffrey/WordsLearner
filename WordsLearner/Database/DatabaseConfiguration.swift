@@ -183,6 +183,87 @@ func createAppDatabase(
         )
         .execute(db)
     }
+
+    // Migration to add comparison audio metadata columns
+    migrator.registerMigration("v1.5 - Add audio columns to comparisonHistories") { db in
+        try #sql(
+            """
+            ALTER TABLE "comparisonHistories"
+            ADD COLUMN "audioRelativePath" TEXT
+            """
+        )
+        .execute(db)
+
+        try #sql(
+            """
+            ALTER TABLE "comparisonHistories"
+            ADD COLUMN "audioDurationSeconds" REAL
+            """
+        )
+        .execute(db)
+
+        try #sql(
+            """
+            ALTER TABLE "comparisonHistories"
+            ADD COLUMN "audioGeneratedAt" TEXT
+            """
+        )
+        .execute(db)
+
+        try #sql(
+            """
+            ALTER TABLE "comparisonHistories"
+            ADD COLUMN "audioVoiceID" TEXT
+            """
+        )
+        .execute(db)
+
+        try #sql(
+            """
+            ALTER TABLE "comparisonHistories"
+            ADD COLUMN "audioModel" TEXT
+            """
+        )
+        .execute(db)
+
+        try #sql(
+            """
+            CREATE INDEX "idx_comparisonHistories_audioGeneratedAt"
+            ON "comparisonHistories" ("audioGeneratedAt" DESC)
+            """
+        )
+        .execute(db)
+    }
+
+    // Migration to add audio payload columns for iCloud-synced playback across devices.
+    migrator.registerMigration("v1.6 - Add synced audio payload columns to comparisonHistories") { db in
+        try #sql(
+            """
+            ALTER TABLE "comparisonHistories"
+            ADD COLUMN "audioFileExtension" TEXT
+            """
+        )
+        .execute(db)
+
+        try #sql(
+            """
+            ALTER TABLE "comparisonHistories"
+            ADD COLUMN "audioData" BLOB
+            """
+        )
+        .execute(db)
+    }
+
+    // Migration to save generated podcast transcript for audio-enabled comparisons.
+    migrator.registerMigration("v1.7 - Add podcast transcript column to comparisonHistories") { db in
+        try #sql(
+            """
+            ALTER TABLE "comparisonHistories"
+            ADD COLUMN "podcastTranscript" TEXT
+            """
+        )
+        .execute(db)
+    }
     
     // Optional: Create Full-Text Search table for advanced search
     migrator.registerMigration("v1.1 - Create FTS table") { db in

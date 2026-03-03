@@ -17,6 +17,14 @@ nonisolated struct ComparisonHistory: Identifiable, Equatable {
     var response: String
     var date: Date
     var isRead: Bool
+    var audioRelativePath: String? = nil
+    var podcastTranscript: String? = nil
+    var audioFileExtension: String? = nil
+    var audioData: Data? = nil
+    var audioDurationSeconds: Double? = nil
+    var audioGeneratedAt: Date? = nil
+    var audioVoiceID: String? = nil
+    var audioModel: String? = nil
 }
 
 extension ComparisonHistory.Draft: Identifiable {}

@@ -175,7 +175,7 @@ actor BackgroundTaskManager {
             )
             
             // Save to comparison history using shared service
-            try await generator.saveToHistory(
+            _ = try await generator.saveToHistory(
                 task.word1,
                 task.word2,
                 task.sentence,

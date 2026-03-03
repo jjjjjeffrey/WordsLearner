@@ -143,16 +143,7 @@ struct WordComparatorFeature {
 
             case let .lastReadComparisonLoaded(comparison):
                 guard state.sidebarSelection == .history, let comparison else { return .none }
-                showDetail(
-                    &state,
-                    ResponseDetailFeature.State(
-                        word1: comparison.word1,
-                        word2: comparison.word2,
-                        sentence: comparison.sentence,
-                        streamingResponse: comparison.response,
-                        shouldStartStreaming: false
-                    )
-                )
+                showDetail(&state, makeDetailState(for: comparison))
                 return .send(.detail(.hydrateStoredResponse))
 
             case .newComparisonButtonTapped:
@@ -228,30 +219,16 @@ struct WordComparatorFeature {
                 
             case let .historyList(.delegate(.comparisonSelected(comparison))):
                 lastReadComparisonStore.set(comparison.id.uuidString)
-                showDetail(
-                    &state,
-                    ResponseDetailFeature.State(
-                    word1: comparison.word1,
-                    word2: comparison.word2,
-                    sentence: comparison.sentence,
-                    streamingResponse: comparison.response,
-                    shouldStartStreaming: false
-                    )
-                )
+                showDetail(&state, makeDetailState(for: comparison))
                 return .send(.detail(.hydrateStoredResponse))
 
             case let .backgroundTasks(.delegate(.comparisonSelected(comparison))):
-                showDetail(
-                    &state,
-                    ResponseDetailFeature.State(
-                    word1: comparison.word1,
-                    word2: comparison.word2,
-                    sentence: comparison.sentence,
-                    streamingResponse: comparison.response,
-                    shouldStartStreaming: false
-                    )
-                )
+                showDetail(&state, makeDetailState(for: comparison))
                 return .send(.detail(.hydrateStoredResponse))
+
+            case let .detail(.comparisonSaved(id)):
+                state.detail?.comparisonID = id
+                return .none
 
             case .binding(\.sidebarSelection):
                 activateSelection(&state)
@@ -298,9 +275,10 @@ struct WordComparatorFeature {
     private func activateSelection(_ state: inout State) {
         guard let selection = state.sidebarSelection else {
             state.sidebarSelection = .history
-            state.historyList = nil
+            if state.historyList == nil {
+                state.historyList = ComparisonHistoryListFeature.State()
+            }
             state.backgroundTasks = nil
-            state.detail = nil
             return
         }
 
@@ -321,6 +299,21 @@ struct WordComparatorFeature {
         if selection != .history {
             state.detail = nil
         }
+    }
+
+    private func makeDetailState(for comparison: ComparisonHistory) -> ResponseDetailFeature.State {
+        var detailState = ResponseDetailFeature.State(
+            word1: comparison.word1,
+            word2: comparison.word2,
+            sentence: comparison.sentence,
+            comparisonID: comparison.id,
+            streamingResponse: comparison.response,
+            shouldStartStreaming: false,
+            audioRelativePath: comparison.audioRelativePath,
+            audioDurationSeconds: comparison.audioDurationSeconds
+        )
+        detailState.podcastTranscript = comparison.podcastTranscript ?? ""
+        return detailState
     }
 
     private func showDetail(_ state: inout State, _ detail: ResponseDetailFeature.State) {

@@ -20,6 +20,7 @@ struct ResponseDetailFeatureTests {
     @Test
     func testOnAppearWithShouldStartStreamingTrue() async {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: String.self)
+        let savedID = UUID()
         let store = TestStore(initialState: ResponseDetailFeature.State(
             word1: "word1",
             word2: "word2",
@@ -32,6 +33,7 @@ struct ResponseDetailFeatureTests {
                 generateComparison: { _, _, _ in stream },
                 saveToHistory: { @Sendable _, _, _, _ async throws in
                     await Task.yield()
+                    return savedID
                 }
             )
         }
@@ -64,7 +66,9 @@ struct ResponseDetailFeatureTests {
         }
         
         // Verify saveToHistory was called and comparisonSaved is received
-        await store.receive(.comparisonSaved)
+        await store.receive(.comparisonSaved(savedID)) {
+            $0.comparisonID = savedID
+        }
         
         await store.finish()
     }
@@ -108,6 +112,7 @@ struct ResponseDetailFeatureTests {
     @Test
     func testStartStreamingSuccess() async {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: String.self)
+        let savedID = UUID()
         
         let store = TestStore(initialState: ResponseDetailFeature.State(
             word1: "word1",
@@ -120,6 +125,7 @@ struct ResponseDetailFeatureTests {
                 generateComparison: { _, _, _ in stream },
                 saveToHistory: { @Sendable _, _, _, _ async throws in
                     await Task.yield()
+                    return savedID
                 }
             )
         }
@@ -176,7 +182,9 @@ struct ResponseDetailFeatureTests {
         }
         
         // Verify saveToHistory was called and comparisonSaved is received
-        await store.receive(.comparisonSaved)
+        await store.receive(.comparisonSaved(savedID)) {
+            $0.comparisonID = savedID
+        }
     }
     
     @Test
@@ -249,6 +257,7 @@ struct ResponseDetailFeatureTests {
                 generateComparison: { _, _, _ in stream },
                 saveToHistory: { @Sendable _, _, _, _ async throws in
                     await Task.yield()
+                    return UUID()
                 }
             )
         }
@@ -330,6 +339,7 @@ struct ResponseDetailFeatureTests {
     @Test
     func testComparisonSaved() async {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: String.self)
+        let savedID = UUID()
         var saveCalled = false
         var savedWord1: String?
         var savedWord2: String?
@@ -352,6 +362,7 @@ struct ResponseDetailFeatureTests {
                     savedSentence = sentence
                     savedResponse = response
                     await Task.yield()
+                    return savedID
                 }
             )
         }
@@ -392,7 +403,9 @@ struct ResponseDetailFeatureTests {
         }
         
         // Verify save was called with correct parameters
-        await store.receive(.comparisonSaved)
+        await store.receive(.comparisonSaved(savedID)) {
+            $0.comparisonID = savedID
+        }
         
         #expect(saveCalled == true)
         #expect(savedWord1 == "word1")
@@ -402,7 +415,590 @@ struct ResponseDetailFeatureTests {
     }
     
     // MARK: - Share Functionality Test
-    
+
+    @Test
+    func testGenerateAudioButtonTappedSuccess() async {
+        let transcript = """
+        Alex (Male): Here's the key difference.
+        Mia (Female): Great, let's explain with examples.
+        """
+        let metadata = ComparisonAudioMetadata(
+            relativePath: "ComparisonAudio/test.mp3",
+            durationSeconds: 12.5,
+            voiceID: "voice",
+            model: "model",
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let comparisonID = UUID()
+
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            comparisonID: comparisonID,
+            streamingResponse: "## Result",
+            shouldStartStreaming: false
+        )) {
+            ResponseDetailFeature()
+        } withDependencies: {
+            $0.comparisonPodcastTranscript.generateTranscript = { markdown in
+                #expect(markdown == "## Result")
+                return transcript
+            }
+            $0.comparisonAudioService.generateAndAttach = { id, markdown in
+                #expect(id == comparisonID)
+                #expect(markdown == transcript)
+                return metadata
+            }
+        }
+
+        await store.send(.generateAudioButtonTapped) {
+            $0.isGeneratingAudio = true
+            $0.isGeneratingPodcastTranscript = true
+            $0.audioGenerationProgress = 0.05
+            $0.audioGenerationStatusMessage = "Generating podcast transcript..."
+            $0.audioErrorMessage = nil
+            $0.podcastTranscriptErrorMessage = nil
+            $0.shouldAutoPlayAfterAudioReady = false
+        }
+        await store.receive(.audioGenerationProgressUpdated(0.2, "Generating podcast transcript...")) {
+            $0.audioGenerationProgress = 0.2
+            $0.audioGenerationStatusMessage = "Generating podcast transcript..."
+        }
+        await store.receive(.podcastTranscriptSucceeded(transcript)) {
+            $0.isGeneratingPodcastTranscript = false
+            $0.podcastTranscript = transcript
+            $0.podcastTranscriptErrorMessage = nil
+        }
+        await store.receive(.audioGenerationProgressUpdated(0.6, "Generating audio...")) {
+            $0.audioGenerationProgress = 0.6
+            $0.audioGenerationStatusMessage = "Generating audio..."
+        }
+        await store.receive(.audioGenerationSucceeded(metadata)) {
+            $0.isGeneratingAudio = false
+            $0.audioGenerationProgress = 1
+            $0.audioGenerationStatusMessage = "Completed"
+            $0.audioRelativePath = metadata.relativePath
+            $0.audioDurationSeconds = metadata.durationSeconds
+            $0.shouldAutoPlayAfterAudioReady = true
+        }
+    }
+
+    @Test
+    func testGenerateAudioButtonTappedFailure() async {
+        struct AudioError: Error, LocalizedError {
+            var errorDescription: String? { "Audio generation failed" }
+        }
+
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            comparisonID: UUID(),
+            streamingResponse: "## Result",
+            shouldStartStreaming: false
+        )) {
+            ResponseDetailFeature()
+        } withDependencies: {
+            $0.comparisonPodcastTranscript.generateTranscript = { _ in
+                "Alex (Male): Test\nMia (Female): Test"
+            }
+            $0.comparisonAudioService.generateAndAttach = { _, _ in
+                throw AudioError()
+            }
+        }
+
+        await store.send(.generateAudioButtonTapped) {
+            $0.isGeneratingAudio = true
+            $0.isGeneratingPodcastTranscript = true
+            $0.audioGenerationProgress = 0.05
+            $0.audioGenerationStatusMessage = "Generating podcast transcript..."
+            $0.audioErrorMessage = nil
+            $0.podcastTranscriptErrorMessage = nil
+            $0.shouldAutoPlayAfterAudioReady = false
+        }
+        await store.receive(.audioGenerationProgressUpdated(0.2, "Generating podcast transcript...")) {
+            $0.audioGenerationProgress = 0.2
+            $0.audioGenerationStatusMessage = "Generating podcast transcript..."
+        }
+        await store.receive(.podcastTranscriptSucceeded("Alex (Male): Test\nMia (Female): Test")) {
+            $0.isGeneratingPodcastTranscript = false
+            $0.podcastTranscript = "Alex (Male): Test\nMia (Female): Test"
+            $0.podcastTranscriptErrorMessage = nil
+        }
+        await store.receive(.audioGenerationProgressUpdated(0.6, "Generating audio...")) {
+            $0.audioGenerationProgress = 0.6
+            $0.audioGenerationStatusMessage = "Generating audio..."
+        }
+        await store.receive(.audioGenerationFailed("Audio generation failed")) {
+            $0.isGeneratingAudio = false
+            $0.audioGenerationProgress = 0
+            $0.audioGenerationStatusMessage = nil
+            $0.audioErrorMessage = "Audio generation failed"
+        }
+    }
+
+    @Test
+    func testGenerateAudioButtonTappedWithoutComparisonIDNoop() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            comparisonID: nil,
+            streamingResponse: "## Result",
+            shouldStartStreaming: false
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.generateAudioButtonTapped)
+    }
+
+    @Test
+    func testGenerateAudioButtonTappedRegeneratesPodcastTranscript() async {
+        let metadata = ComparisonAudioMetadata(
+            relativePath: "ComparisonAudio/test.m4a",
+            durationSeconds: 30,
+            voiceID: "male+female",
+            model: "eleven_multilingual_v2",
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let comparisonID = UUID()
+        let oldPodcastTranscript = """
+        Alex (Male): First line.
+        Mia (Female): Second line.
+        """
+        let newPodcastTranscript = """
+        Alex (Male): Updated first line.
+        Mia (Female): Updated second line.
+        """
+
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            comparisonID: comparisonID,
+            streamingResponse: "## Result",
+            shouldStartStreaming: false,
+            podcastTranscript: oldPodcastTranscript
+        )) {
+            ResponseDetailFeature()
+        } withDependencies: {
+            $0.comparisonPodcastTranscript.generateTranscript = { markdown in
+                #expect(markdown == "## Result")
+                return newPodcastTranscript
+            }
+            $0.comparisonAudioService.generateAndAttach = { id, source in
+                #expect(id == comparisonID)
+                #expect(source == newPodcastTranscript)
+                return metadata
+            }
+        }
+
+        await store.send(.generateAudioButtonTapped) {
+            $0.isGeneratingAudio = true
+            $0.isGeneratingPodcastTranscript = true
+            $0.audioGenerationProgress = 0.05
+            $0.audioGenerationStatusMessage = "Generating podcast transcript..."
+            $0.audioErrorMessage = nil
+            $0.podcastTranscriptErrorMessage = nil
+            $0.shouldAutoPlayAfterAudioReady = false
+        }
+        await store.receive(.audioGenerationProgressUpdated(0.2, "Generating podcast transcript...")) {
+            $0.audioGenerationProgress = 0.2
+            $0.audioGenerationStatusMessage = "Generating podcast transcript..."
+        }
+        await store.receive(.podcastTranscriptSucceeded(newPodcastTranscript)) {
+            $0.isGeneratingPodcastTranscript = false
+            $0.podcastTranscript = newPodcastTranscript
+            $0.podcastTranscriptErrorMessage = nil
+        }
+        await store.receive(.audioGenerationProgressUpdated(0.6, "Generating audio...")) {
+            $0.audioGenerationProgress = 0.6
+            $0.audioGenerationStatusMessage = "Generating audio..."
+        }
+        await store.receive(.audioGenerationSucceeded(metadata)) {
+            $0.isGeneratingAudio = false
+            $0.audioGenerationProgress = 1
+            $0.audioGenerationStatusMessage = "Completed"
+            $0.audioRelativePath = metadata.relativePath
+            $0.audioDurationSeconds = metadata.durationSeconds
+            $0.shouldAutoPlayAfterAudioReady = true
+        }
+    }
+
+    @Test
+    func testOnAppearWithExistingGeneratedPodcastHydratesWithoutResettingPodcastState() async {
+        let rendered = await AttributedStringRenderer.renderMarkdown("## Result")
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            comparisonID: UUID(),
+            streamingResponse: "## Result",
+            shouldStartStreaming: false,
+            audioRelativePath: "ComparisonAudio/existing.m4a",
+            audioDurationSeconds: 42.0,
+            podcastTranscript: """
+            Alex (Male): Existing podcast transcript.
+            Mia (Female): Existing podcast transcript response.
+            """
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.onAppear)
+        await store.receive(.hydrateStoredResponse)
+        await store.receive(.attributedStringRendered(rendered)) {
+            $0.attributedString = rendered
+        }
+
+        #expect(store.state.audioRelativePath == "ComparisonAudio/existing.m4a")
+        #expect(store.state.audioDurationSeconds == 42.0)
+        #expect(store.state.podcastTranscript.contains("Alex (Male): Existing podcast transcript."))
+        #expect(store.state.podcastTranscript.contains("Mia (Female): Existing podcast transcript response."))
+    }
+
+    @Test
+    func testGenerateAudioButtonTappedTranscriptFailure() async {
+        struct TranscriptError: Error, LocalizedError {
+            var errorDescription: String? { "Podcast transcript failed" }
+        }
+
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            comparisonID: UUID(),
+            streamingResponse: "## Result",
+            shouldStartStreaming: false
+        )) {
+            ResponseDetailFeature()
+        } withDependencies: {
+            $0.comparisonPodcastTranscript.generateTranscript = { _ in
+                throw TranscriptError()
+            }
+            $0.comparisonAudioService.generateAndAttach = { _, _ in
+                #expect(Bool(false), "audio generation should not be called when transcript generation fails")
+                return ComparisonAudioMetadata(
+                    relativePath: "",
+                    durationSeconds: 0,
+                    voiceID: "",
+                    model: "",
+                    generatedAt: .distantPast
+                )
+            }
+        }
+
+        await store.send(.generateAudioButtonTapped) {
+            $0.isGeneratingAudio = true
+            $0.isGeneratingPodcastTranscript = true
+            $0.audioGenerationProgress = 0.05
+            $0.audioGenerationStatusMessage = "Generating podcast transcript..."
+            $0.audioErrorMessage = nil
+            $0.podcastTranscriptErrorMessage = nil
+            $0.shouldAutoPlayAfterAudioReady = false
+        }
+        await store.receive(.audioGenerationProgressUpdated(0.2, "Generating podcast transcript...")) {
+            $0.audioGenerationProgress = 0.2
+            $0.audioGenerationStatusMessage = "Generating podcast transcript..."
+        }
+        await store.receive(.audioGenerationFailed("Podcast transcript failed")) {
+            $0.isGeneratingAudio = false
+            $0.isGeneratingPodcastTranscript = false
+            $0.audioGenerationProgress = 0
+            $0.audioGenerationStatusMessage = nil
+            $0.audioErrorMessage = "Podcast transcript failed"
+        }
+    }
+
+    @Test
+    func testGeneratePodcastTranscriptButtonTappedSuccess() async {
+        let transcript = """
+        Alex (Male): Here's the key difference.
+        Mia (Female): Great, let's explain with examples.
+        """
+
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            streamingResponse: "## Result",
+            shouldStartStreaming: false
+        )) {
+            ResponseDetailFeature()
+        } withDependencies: {
+            $0.comparisonPodcastTranscript.generateTranscript = { markdown in
+                #expect(markdown == "## Result")
+                return transcript
+            }
+        }
+
+        await store.send(.generatePodcastTranscriptButtonTapped) {
+            $0.isGeneratingPodcastTranscript = true
+            $0.podcastTranscriptErrorMessage = nil
+        }
+        await store.receive(.podcastTranscriptSucceeded(transcript)) {
+            $0.isGeneratingPodcastTranscript = false
+            $0.podcastTranscript = transcript
+            $0.podcastTranscriptErrorMessage = nil
+        }
+    }
+
+    @Test
+    func testGeneratePodcastTranscriptButtonTappedFailure() async {
+        struct TranscriptError: Error, LocalizedError {
+            var errorDescription: String? { "Transcript generation failed" }
+        }
+
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            streamingResponse: "## Result",
+            shouldStartStreaming: false
+        )) {
+            ResponseDetailFeature()
+        } withDependencies: {
+            $0.comparisonPodcastTranscript.generateTranscript = { _ in
+                throw TranscriptError()
+            }
+        }
+
+        await store.send(.generatePodcastTranscriptButtonTapped) {
+            $0.isGeneratingPodcastTranscript = true
+            $0.podcastTranscriptErrorMessage = nil
+        }
+        await store.receive(.podcastTranscriptFailed("Transcript generation failed")) {
+            $0.isGeneratingPodcastTranscript = false
+            $0.podcastTranscriptErrorMessage = "Transcript generation failed"
+        }
+    }
+
+    @Test
+    func testGeneratePodcastTranscriptButtonTappedWithoutResponseNoop() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            streamingResponse: "",
+            shouldStartStreaming: false
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.generatePodcastTranscriptButtonTapped)
+    }
+
+    @Test
+    func testMarkdownDetailButtonTappedPresentsDestination() async {
+        let attributed = AttributedString("Rendered")
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            streamingResponse: "## Result",
+            attributedString: attributed,
+            shouldStartStreaming: false
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.markdownDetailButtonTapped) {
+            $0.markdownDetail =
+                MarkdownDetailFeature.State(
+                    markdown: "## Result",
+                    attributedString: attributed
+                )
+        }
+    }
+
+    @Test
+    func testMarkdownDetailButtonTappedWithoutResponseNoop() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            streamingResponse: "   ",
+            shouldStartStreaming: false
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.markdownDetailButtonTapped)
+    }
+
+    @Test
+    func testStreamChunkReceivedUpdatesPresentedMarkdownDetail() async {
+        let initialAttributed = AttributedString("Initial rendered")
+        let initialMarkdown = "Initial markdown"
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            streamingResponse: initialMarkdown,
+            attributedString: initialAttributed,
+            shouldStartStreaming: false,
+            markdownDetail: MarkdownDetailFeature.State(
+                markdown: initialMarkdown,
+                attributedString: initialAttributed
+            )
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.streamChunkReceived(" + chunk")) {
+            $0.streamingResponse = "Initial markdown + chunk"
+            $0.markdownDetail?.markdown = "Initial markdown + chunk"
+        }
+
+        let rendered = await AttributedStringRenderer.renderMarkdown("Initial markdown + chunk")
+        await store.receive(.attributedStringRendered(rendered)) {
+            $0.attributedString = rendered
+            $0.markdownDetail?.attributedString = rendered
+        }
+    }
+
+    @Test
+    func testAudioGenerationProgressIsClamped() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            shouldStartStreaming: false
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.audioGenerationProgressUpdated(-1, "Start")) {
+            $0.audioGenerationProgress = 0
+            $0.audioGenerationStatusMessage = "Start"
+        }
+        await store.send(.audioGenerationProgressUpdated(2, "End")) {
+            $0.audioGenerationProgress = 1
+            $0.audioGenerationStatusMessage = "End"
+        }
+    }
+
+    @Test
+    func testGenerateAudioButtonTappedWithoutResponseNoop() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            comparisonID: UUID(),
+            streamingResponse: "   ",
+            shouldStartStreaming: false
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.generateAudioButtonTapped)
+    }
+
+    @Test
+    func testGenerateAudioButtonTappedWhileGeneratingNoop() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            comparisonID: UUID(),
+            streamingResponse: "## Result",
+            shouldStartStreaming: false,
+            isGeneratingAudio: true
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.generateAudioButtonTapped)
+    }
+
+    @Test
+    func testGeneratePodcastTranscriptButtonTappedWhileGeneratingNoop() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            streamingResponse: "## Result",
+            shouldStartStreaming: false,
+            isGeneratingPodcastTranscript: true
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.generatePodcastTranscriptButtonTapped)
+    }
+
+    @Test
+    func testAudioPlaybackActionsDisableAutoPlay() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            shouldStartStreaming: false,
+            shouldAutoPlayAfterAudioReady: true
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.audioPlaybackToggled) {
+            $0.shouldAutoPlayAfterAudioReady = false
+        }
+        await store.send(.audioPlaybackStopped)
+    }
+
+    @Test
+    func testDismissMarkdownDetailDestination() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            streamingResponse: "## Result",
+            shouldStartStreaming: false,
+            markdownDetail: MarkdownDetailFeature.State(
+                markdown: "## Result",
+                attributedString: AttributedString("Result")
+            )
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.markdownDetail(.dismiss)) {
+            $0.markdownDetail = nil
+        }
+    }
+
+    @Test
+    func testMarkdownDetailCanReopenAfterDismiss() async {
+        let rendered = AttributedString("Rendered")
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            streamingResponse: "## Result",
+            attributedString: rendered,
+            shouldStartStreaming: false
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.markdownDetailButtonTapped) {
+            $0.markdownDetail = MarkdownDetailFeature.State(
+                markdown: "## Result",
+                attributedString: rendered
+            )
+        }
+        await store.send(.markdownDetail(.dismiss)) {
+            $0.markdownDetail = nil
+        }
+        await store.send(.markdownDetailButtonTapped) {
+            $0.markdownDetail = MarkdownDetailFeature.State(
+                markdown: "## Result",
+                attributedString: rendered
+            )
+        }
+    }
+
     @Test
     func testShareButtonTapped() async {
         var capturedShareText: String?

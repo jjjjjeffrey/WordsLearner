@@ -51,10 +51,12 @@ nonisolated struct ComparisonGenerationService: @unchecked Sendable {
         sentence: String,
         response: String,
         date: Date
-    ) async throws {
+    ) async throws -> UUID {
+        let id = UUID()
         try await database.write { db in
             try ComparisonHistory.insert {
                 ComparisonHistory.Draft(
+                    id: id,
                     word1: word1,
                     word2: word2,
                     sentence: sentence,
@@ -65,6 +67,7 @@ nonisolated struct ComparisonGenerationService: @unchecked Sendable {
             }
             .execute(db)
         }
+        return id
     }
     
     /// Build prompt for AI
@@ -96,7 +99,7 @@ nonisolated struct ComparisonGenerationService: @unchecked Sendable {
 
 nonisolated struct ComparisonGenerationServiceClient: Sendable {
     var generateComparison: @Sendable (String, String, String) -> AsyncThrowingStream<String, Error>
-    var saveToHistory: @Sendable (String, String, String, String) async throws -> Void
+    var saveToHistory: @Sendable (String, String, String, String) async throws -> UUID
 }
 
 extension ComparisonGenerationServiceClient: DependencyKey {
@@ -128,7 +131,7 @@ extension ComparisonGenerationServiceClient: DependencyKey {
                     continuation.finish()
                 }
             },
-            saveToHistory: { _, _, _, _ in }
+            saveToHistory: { _, _, _, _ in UUID() }
         )
     }
 
