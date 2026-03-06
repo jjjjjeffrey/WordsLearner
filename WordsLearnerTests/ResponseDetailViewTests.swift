@@ -369,4 +369,63 @@ struct ResponseDetailViewTests {
         )
         assertSnapshots(view, name: "audioRegeneratingReset")
     }
+
+    @Test
+    func comparisonResponseAudioPlayerReplacesPausedSourceBeforePlayingNewSelection() async throws {
+        let player = ComparisonResponseAudioPlayer()
+        let firstAudio = makePCM16MonoWAVData(frequency: 440)
+        let secondAudio = makePCM16MonoWAVData(frequency: 660)
+
+        player.play(data: firstAudio) {}
+        let firstFingerprint = try #require(player.loadedSourceFingerprint)
+        player.pause()
+
+        player.play(data: secondAudio) {}
+        let secondFingerprint = try #require(player.loadedSourceFingerprint)
+
+        #expect(firstFingerprint != secondFingerprint)
+        player.stop(clearPosition: true)
+        #expect(player.loadedSourceFingerprint == nil)
+    }
+}
+
+private func makePCM16MonoWAVData(
+    sampleRate: Int = 8_000,
+    durationSeconds: Double = 0.15,
+    frequency: Double
+) -> Data {
+    let frameCount = Int(Double(sampleRate) * durationSeconds)
+    let bytesPerSample = 2
+    let dataSize = frameCount * bytesPerSample
+    var data = Data()
+
+    data.append("RIFF".data(using: .ascii)!)
+    data.append(UInt32(36 + dataSize).littleEndianData)
+    data.append("WAVE".data(using: .ascii)!)
+    data.append("fmt ".data(using: .ascii)!)
+    data.append(UInt32(16).littleEndianData)
+    data.append(UInt16(1).littleEndianData)
+    data.append(UInt16(1).littleEndianData)
+    data.append(UInt32(sampleRate).littleEndianData)
+    data.append(UInt32(sampleRate * bytesPerSample).littleEndianData)
+    data.append(UInt16(bytesPerSample).littleEndianData)
+    data.append(UInt16(16).littleEndianData)
+    data.append("data".data(using: .ascii)!)
+    data.append(UInt32(dataSize).littleEndianData)
+
+    for frame in 0..<frameCount {
+        let time = Double(frame) / Double(sampleRate)
+        let sample = sin(2 * Double.pi * frequency * time)
+        let amplitude = Int16(sample * Double(Int16.max) * 0.35)
+        data.append(amplitude.littleEndianData)
+    }
+
+    return data
+}
+
+private extension FixedWidthInteger {
+    var littleEndianData: Data {
+        var value = self.littleEndian
+        return Data(bytes: &value, count: MemoryLayout<Self>.size)
+    }
 }

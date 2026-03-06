@@ -108,6 +108,14 @@ Do not treat schema work as an implementation detail.
 
 If a feature touches storage, networking, media, or snapshots, validate macOS explicitly.
 
+### 8. View-local imperative state must track artifact identity
+
+- If a SwiftUI view can display different persisted artifacts over time, do not let `@State`, `@StateObject`, players, timers, delegates, or controller wrappers silently outlive the artifact they operate on.
+- When artifact identity changes, either reset the view-local object immediately or verify that its loaded resource still matches current feature state before resuming/reusing it.
+- This applies especially to media playback, background tasks, streaming handles, and any wrapper around framework objects that keep internal mutable state.
+
+Do not assume TCA state replacement is enough if the actual side-effectful object lives in the view layer.
+
 ## Implementation Checklist
 
 When adding a new WordsLearner feature, check these in order:
@@ -116,11 +124,13 @@ When adding a new WordsLearner feature, check these in order:
 2. Decide persistence/storage/sync expectations before UI refinement.
 3. Create dedicated reducer state/actions for the feature.
 4. Model navigation as child state if the destination has meaningful behavior.
-5. Keep reusable infra separate from feature-specific logic.
-6. Add migrations and old-row compatibility if persistence changes.
-7. Add reducer tests for guards, success, failure, and restored state.
-8. Add snapshot coverage for every meaningful UI status.
-9. Run tests on both macOS and iOS before considering the feature complete.
+5. Reset or re-key any view-local imperative object when the displayed artifact identity can change.
+6. Keep reusable infra separate from feature-specific logic.
+7. Add migrations and old-row compatibility if persistence changes.
+8. Add reducer tests for guards, success, failure, and restored state.
+9. Add snapshot coverage for every meaningful UI status.
+10. Manually test cross-item transitions for media/controller features: open A, start, pause or interrupt, switch to B, start again, and confirm the active resource belongs to B.
+11. Run tests on both macOS and iOS before considering the feature complete.
 
 ## Testing Requirements
 

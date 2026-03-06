@@ -66,6 +66,11 @@ struct ResponseDetailView: View {
             guard shouldAutoPlay else { return }
             playAudio()
         }
+        .onChange(of: store.audioRelativePath) { oldValue, newValue in
+            guard oldValue != newValue else { return }
+            audioPlayer.stop(clearPosition: true)
+            store.send(.audioPlaybackStopped)
+        }
         .onDisappear {
             audioPlayer.pause()
             store.send(.audioPlaybackPaused)
@@ -422,15 +427,21 @@ struct ResponseDetailView: View {
 }
 
 @MainActor
-private final class ComparisonResponseAudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
+final class ComparisonResponseAudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published private(set) var isPlaying = false
     @Published private(set) var currentTimeSeconds: Double = 0
+    private(set) var loadedSourceFingerprint: Int?
     private var player: AVAudioPlayer?
     private var progressTimer: Timer?
     private var completion: (() -> Void)?
 
     func play(data: Data, completion: @escaping () -> Void) {
+        let fingerprint = data.hashValue
         if let player {
+            guard loadedSourceFingerprint == fingerprint else {
+                stop(clearPosition: true)
+                return play(data: data, completion: completion)
+            }
             self.completion = completion
             if !player.isPlaying {
                 isPlaying = true
@@ -445,6 +456,7 @@ private final class ComparisonResponseAudioPlayer: NSObject, ObservableObject, A
             createdPlayer.delegate = self
             self.player = createdPlayer
             self.completion = completion
+            loadedSourceFingerprint = fingerprint
             currentTimeSeconds = createdPlayer.currentTime
             isPlaying = true
             createdPlayer.prepareToPlay()
@@ -474,6 +486,7 @@ private final class ComparisonResponseAudioPlayer: NSObject, ObservableObject, A
             player = nil
             completion = nil
             currentTimeSeconds = 0
+            loadedSourceFingerprint = nil
         } else if let player {
             currentTimeSeconds = player.currentTime
         }
