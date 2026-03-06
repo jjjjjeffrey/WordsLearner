@@ -68,6 +68,7 @@ struct ComparisonAudioServiceTests {
             #expect(metadata.voiceID == ComparisonAudioGeneratorClient.defaultVoiceID)
             #expect(metadata.model == ComparisonAudioGeneratorClient.defaultModelID)
             #expect(metadata.generatedAt == now)
+            #expect(metadata.transcriptTurnTimings.isEmpty)
 
             let saved = try await database.read { db in
                 try ComparisonHistory
@@ -82,6 +83,7 @@ struct ComparisonAudioServiceTests {
             #expect(saved?.audioVoiceID == metadata.voiceID)
             #expect(saved?.audioModel == metadata.model)
             #expect(saved?.audioGeneratedAt == metadata.generatedAt)
+            #expect(saved?.audioTranscriptTimingData == nil)
         }
     }
 
@@ -130,6 +132,7 @@ struct ComparisonAudioServiceTests {
             #expect(saved?.audioGeneratedAt == nil)
             #expect(saved?.audioVoiceID == nil)
             #expect(saved?.audioModel == nil)
+            #expect(saved?.audioTranscriptTimingData == nil)
         }
     }
 
@@ -191,6 +194,9 @@ struct ComparisonAudioServiceTests {
             )
             #expect(metadata.model == ComparisonAudioGeneratorClient.defaultModelID)
             #expect(metadata.generatedAt == now)
+            #expect(metadata.transcriptTurnTimings.count == 1)
+            #expect(metadata.transcriptTurnTimings.first?.speaker == PodcastTranscriptParser.alexSpeaker)
+            #expect(metadata.transcriptTurnTimings.first?.text == "First teaching point. More details on same speaker line.")
 
             let saved = try await database.read { db in
                 try ComparisonHistory
@@ -202,6 +208,7 @@ struct ComparisonAudioServiceTests {
             #expect(saved?.audioData == segmentAudio)
             #expect(saved?.audioVoiceID == metadata.voiceID)
             #expect(saved?.audioModel == metadata.model)
+            #expect(PodcastTranscriptTimingCodec.decode(saved?.audioTranscriptTimingData).count == 1)
         }
     }
 
@@ -262,6 +269,9 @@ struct ComparisonAudioServiceTests {
             )
             #expect(metadata.model == ComparisonAudioGeneratorClient.defaultModelID)
             #expect(metadata.generatedAt == now)
+            #expect(metadata.transcriptTurnTimings.count == 1)
+            #expect(metadata.transcriptTurnTimings.first?.speaker == PodcastTranscriptParser.miaSpeaker)
+            #expect(metadata.transcriptTurnTimings.first?.text == "Let's start with the effect in context.")
 
             let saved = try await database.read { db in
                 try ComparisonHistory
@@ -273,6 +283,7 @@ struct ComparisonAudioServiceTests {
             #expect(saved?.audioData == segmentAudio)
             #expect(saved?.audioVoiceID == metadata.voiceID)
             #expect(saved?.audioModel == metadata.model)
+            #expect(PodcastTranscriptTimingCodec.decode(saved?.audioTranscriptTimingData).count == 1)
         }
     }
 }

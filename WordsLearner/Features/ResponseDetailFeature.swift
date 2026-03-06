@@ -33,6 +33,10 @@ struct ResponseDetailFeature {
         var podcastTranscript: String = ""
         var isGeneratingPodcastTranscript: Bool = false
         var podcastTranscriptErrorMessage: String? = nil
+        var transcriptTurnTimings: [PodcastTranscriptTurnTiming] = []
+        var isAudioPlaying: Bool = false
+        var currentAudioTimeSeconds: Double = 0
+        var currentSpeakerTurnText: String? = nil
         @Presents var markdownDetail: MarkdownDetailFeature.State?
     }
     
@@ -52,6 +56,10 @@ struct ResponseDetailFeature {
         case audioGenerationSucceeded(ComparisonAudioMetadata)
         case audioGenerationFailed(String)
         case audioPlaybackToggled
+        case audioPlaybackStarted
+        case audioPlaybackProgressUpdated(Double)
+        case audioPlaybackPaused
+        case audioPlaybackFinished
         case audioPlaybackStopped
         case generatePodcastTranscriptButtonTapped
         case podcastTranscriptSucceeded(String)
@@ -167,6 +175,9 @@ struct ResponseDetailFeature {
                 state.audioErrorMessage = nil
                 state.podcastTranscriptErrorMessage = nil
                 state.shouldAutoPlayAfterAudioReady = false
+                state.isAudioPlaying = false
+                state.currentAudioTimeSeconds = 0
+                state.currentSpeakerTurnText = nil
                 return .run {
                     [
                         comparisonAudioService,
@@ -197,6 +208,7 @@ struct ResponseDetailFeature {
                 state.audioGenerationStatusMessage = "Completed"
                 state.audioRelativePath = metadata.relativePath
                 state.audioDurationSeconds = metadata.durationSeconds
+                state.transcriptTurnTimings = metadata.transcriptTurnTimings
                 state.audioErrorMessage = nil
                 state.shouldAutoPlayAfterAudioReady = true
                 return .none
@@ -213,8 +225,39 @@ struct ResponseDetailFeature {
                 state.shouldAutoPlayAfterAudioReady = false
                 return .none
 
+            case .audioPlaybackStarted:
+                state.shouldAutoPlayAfterAudioReady = false
+                state.isAudioPlaying = true
+                if let currentTurn = activeSpeakerTurn(for: state.currentAudioTimeSeconds, timings: state.transcriptTurnTimings) {
+                    state.currentSpeakerTurnText = currentTurn.displayText
+                }
+                return .none
+
+            case let .audioPlaybackProgressUpdated(currentTime):
+                state.currentAudioTimeSeconds = max(0, currentTime)
+                if let currentTurn = activeSpeakerTurn(
+                    for: state.currentAudioTimeSeconds,
+                    timings: state.transcriptTurnTimings
+                ) {
+                    state.currentSpeakerTurnText = currentTurn.displayText
+                }
+                return .none
+
+            case .audioPlaybackPaused:
+                state.shouldAutoPlayAfterAudioReady = false
+                state.isAudioPlaying = false
+                return .none
+
+            case .audioPlaybackFinished:
+                state.shouldAutoPlayAfterAudioReady = false
+                state.isAudioPlaying = false
+                state.currentAudioTimeSeconds = 0
+                state.currentSpeakerTurnText = nil
+                return .none
+
             case .audioPlaybackStopped:
                 state.shouldAutoPlayAfterAudioReady = false
+                state.isAudioPlaying = false
                 return .none
 
             case .generatePodcastTranscriptButtonTapped:
@@ -277,4 +320,15 @@ struct ResponseDetailFeature {
             MarkdownDetailFeature()
         }
     }
+}
+
+private func activeSpeakerTurn(
+    for timeSeconds: Double,
+    timings: [PodcastTranscriptTurnTiming]
+) -> PodcastTranscriptTurnTiming? {
+    guard !timings.isEmpty else { return nil }
+    if let exact = timings.first(where: { $0.contains(timeSeconds: timeSeconds) }) {
+        return exact
+    }
+    return timings.last(where: { timeSeconds >= $0.startSeconds })
 }

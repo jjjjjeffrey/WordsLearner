@@ -67,8 +67,12 @@ struct ResponseDetailView: View {
             playAudio()
         }
         .onDisappear {
-            audioPlayer.stop()
-            store.send(.audioPlaybackStopped)
+            audioPlayer.pause()
+            store.send(.audioPlaybackPaused)
+        }
+        .onReceive(audioPlayer.$currentTimeSeconds) { currentTime in
+            guard audioPlayer.isPlaying else { return }
+            store.send(.audioPlaybackProgressUpdated(currentTime))
         }
     }
     
@@ -231,6 +235,8 @@ struct ResponseDetailView: View {
                     .buttonStyle(.borderedProminent)
 
                     Button {
+                        audioPlayer.stop(clearPosition: true)
+                        store.send(.audioPlaybackFinished)
                         store.send(.generateAudioButtonTapped)
                     } label: {
                         HStack(spacing: 8) {
@@ -272,6 +278,23 @@ struct ResponseDetailView: View {
                     .font(.caption)
                     .foregroundColor(.red)
             }
+
+            if let currentTurnText = store.currentSpeakerTurnText {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(store.isAudioPlaying ? "Now Speaking" : "Paused At")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(currentTurnText)
+                        .font(.callout)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(AppColors.background)
+                        )
+                }
+            }
         }
         .padding()
         .background(
@@ -285,19 +308,12 @@ struct ResponseDetailView: View {
             Label("Podcast Transcript", systemImage: "text.bubble")
                 .font(.headline)
 
-            if !store.podcastTranscript.isEmpty {
-                Text(store.podcastTranscript)
-                    .textSelection(.enabled)
-                    .font(.callout)
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(AppColors.background)
-                    )
-            }
-            else {
+            if store.currentSpeakerTurnText == nil {
                 Text("Transcript will appear here after generating audio.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                Text("Showing one speaker turn at a time during playback.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -355,21 +371,20 @@ struct ResponseDetailView: View {
 
     private func togglePlayback() {
         if audioPlayer.isPlaying {
-            audioPlayer.stop()
-            store.send(.audioPlaybackStopped)
+            audioPlayer.pause()
+            store.send(.audioPlaybackPaused)
         } else {
             playAudio()
         }
-        store.send(.audioPlaybackToggled)
     }
 
     private func playAudio() {
         guard let relativePath = store.audioRelativePath else { return }
         guard let data = try? audioAssetStore.loadAudioData(relativePath) else { return }
 
-        store.send(.audioPlaybackToggled)
+        store.send(.audioPlaybackStarted)
         audioPlayer.play(data: data) {
-            store.send(.audioPlaybackStopped)
+            store.send(.audioPlaybackFinished)
         }
     }
 
@@ -409,35 +424,76 @@ struct ResponseDetailView: View {
 @MainActor
 private final class ComparisonResponseAudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published private(set) var isPlaying = false
+    @Published private(set) var currentTimeSeconds: Double = 0
     private var player: AVAudioPlayer?
+    private var progressTimer: Timer?
     private var completion: (() -> Void)?
 
     func play(data: Data, completion: @escaping () -> Void) {
-        stop()
-        do {
-            let player = try AVAudioPlayer(data: data)
-            player.delegate = self
-            self.player = player
+        if let player {
             self.completion = completion
+            if !player.isPlaying {
+                isPlaying = true
+                player.play()
+                startProgressTimer()
+            }
+            return
+        }
+
+        do {
+            let createdPlayer = try AVAudioPlayer(data: data)
+            createdPlayer.delegate = self
+            self.player = createdPlayer
+            self.completion = completion
+            currentTimeSeconds = createdPlayer.currentTime
             isPlaying = true
-            player.prepareToPlay()
-            player.play()
+            createdPlayer.prepareToPlay()
+            createdPlayer.play()
+            startProgressTimer()
         } catch {
-            stop()
+            stop(clearPosition: true)
         }
     }
 
-    func stop() {
-        player?.stop()
-        player = nil
-        completion = nil
+    func pause() {
+        player?.pause()
+        progressTimer?.invalidate()
+        progressTimer = nil
+        if let player {
+            currentTimeSeconds = player.currentTime
+        }
         isPlaying = false
+    }
+
+    func stop(clearPosition: Bool = true) {
+        progressTimer?.invalidate()
+        progressTimer = nil
+        player?.stop()
+        isPlaying = false
+        if clearPosition {
+            player = nil
+            completion = nil
+            currentTimeSeconds = 0
+        } else if let player {
+            currentTimeSeconds = player.currentTime
+        }
+    }
+
+    private func startProgressTimer() {
+        progressTimer?.invalidate()
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                guard let player = self.player else { return }
+                self.currentTimeSeconds = player.currentTime
+            }
+        }
     }
 
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         Task { @MainActor in
             let completion = self.completion
-            stop()
+            stop(clearPosition: true)
             if flag {
                 completion?()
             }

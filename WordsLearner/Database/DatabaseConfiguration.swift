@@ -264,6 +264,17 @@ func createAppDatabase(
         )
         .execute(db)
     }
+
+    // Migration to persist per-speaker transcript timings for synced playback progress.
+    migrator.registerMigration("v1.8 - Add transcript timing data column to comparisonHistories") { db in
+        try #sql(
+            """
+            ALTER TABLE "comparisonHistories"
+            ADD COLUMN "audioTranscriptTimingData" TEXT
+            """
+        )
+        .execute(db)
+    }
     
     // Optional: Create Full-Text Search table for advanced search
     migrator.registerMigration("v1.1 - Create FTS table") { db in

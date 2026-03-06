@@ -936,7 +936,15 @@ struct ResponseDetailFeatureTests {
             word2: "effect",
             sentence: "The policy will affect the final effect.",
             shouldStartStreaming: false,
-            shouldAutoPlayAfterAudioReady: true
+            shouldAutoPlayAfterAudioReady: true,
+            transcriptTurnTimings: [
+                PodcastTranscriptTurnTiming(
+                    speaker: "Alex (Male)",
+                    text: "First line.",
+                    startSeconds: 0,
+                    endSeconds: 5
+                )
+            ]
         )) {
             ResponseDetailFeature()
         }
@@ -944,7 +952,21 @@ struct ResponseDetailFeatureTests {
         await store.send(.audioPlaybackToggled) {
             $0.shouldAutoPlayAfterAudioReady = false
         }
-        await store.send(.audioPlaybackStopped)
+        await store.send(.audioPlaybackStarted) {
+            $0.isAudioPlaying = true
+            $0.currentSpeakerTurnText = "Alex (Male): First line."
+        }
+        await store.send(.audioPlaybackProgressUpdated(2.5)) {
+            $0.currentAudioTimeSeconds = 2.5
+            $0.currentSpeakerTurnText = "Alex (Male): First line."
+        }
+        await store.send(.audioPlaybackPaused) {
+            $0.isAudioPlaying = false
+        }
+        await store.send(.audioPlaybackFinished) {
+            $0.currentAudioTimeSeconds = 0
+            $0.currentSpeakerTurnText = nil
+        }
     }
 
     @Test

@@ -25,6 +25,7 @@ nonisolated struct ComparisonHistory: Identifiable, Equatable {
     var audioGeneratedAt: Date? = nil
     var audioVoiceID: String? = nil
     var audioModel: String? = nil
+    var audioTranscriptTimingData: String? = nil
 }
 
 extension ComparisonHistory.Draft: Identifiable {}

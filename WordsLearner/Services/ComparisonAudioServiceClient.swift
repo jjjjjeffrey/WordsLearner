@@ -14,11 +14,7 @@ struct ComparisonAudioMetadata: Equatable, Sendable {
     var voiceID: String
     var model: String
     var generatedAt: Date
-}
-
-private struct PodcastAudioSegment: Sendable {
-    var text: String
-    var voiceID: String
+    var transcriptTurnTimings: [PodcastTranscriptTurnTiming] = []
 }
 
 enum ComparisonAudioServiceError: LocalizedError {
@@ -58,32 +54,41 @@ extension ComparisonAudioServiceClient: DependencyKey {
         return Self(
             generateAndAttach: { comparisonID, markdown in
                 let sourceText = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
-                let podcastSegments = parsePodcastSegments(sourceText)
+                let podcastTurns = PodcastTranscriptParser.parseTurns(
+                    from: sourceText,
+                    maleVoiceID: Self.podcastMaleVoiceID,
+                    femaleVoiceID: Self.podcastFemaleVoiceID
+                )
 
                 let audioData: Data
                 let fileExtension: String
                 let voiceID: String
+                var transcriptTurnTimings: [PodcastTranscriptTurnTiming]
                 let modelID = ComparisonAudioGeneratorClient.defaultModelID
 
-                if podcastSegments.isEmpty {
+                if podcastTurns.isEmpty {
                     let narrationText = formatter.makeNarrationText(markdown)
                     audioData = try await generator.generateAudio(narrationText)
                     fileExtension = "mp3"
                     voiceID = ComparisonAudioGeneratorClient.defaultVoiceID
+                    transcriptTurnTimings = []
                 } else {
                     var segmentFiles: [URL] = []
+                    var segmentDurations: [Double] = []
                     defer {
                         for url in segmentFiles {
                             try? FileManager.default.removeItem(at: url)
                         }
                     }
 
-                    for segment in podcastSegments {
+                    for turn in podcastTurns {
                         let segmentAudio = try await elevenLabsAudioGenerator.generateAudio(
-                            segment.text,
-                            segment.voiceID,
+                            turn.text,
+                            turn.voiceID,
                             modelID
                         )
+                        let segmentDuration = (try? AVAudioPlayer(data: segmentAudio).duration) ?? 0
+                        segmentDurations.append(max(0, segmentDuration))
                         let tempURL = FileManager.default.temporaryDirectory
                             .appendingPathComponent(UUID().uuidString)
                             .appendingPathExtension("mp3")
@@ -99,6 +104,10 @@ extension ComparisonAudioServiceClient: DependencyKey {
                         fileExtension = "m4a"
                     }
                     voiceID = "\(Self.podcastMaleVoiceID)+\(Self.podcastFemaleVoiceID)"
+                    transcriptTurnTimings = makeTranscriptTurnTimings(
+                        from: podcastTurns,
+                        segmentDurations: segmentDurations
+                    )
                 }
 
                 let relativePath = try assetStore.writeAudio(audioData, comparisonID, fileExtension)
@@ -113,7 +122,8 @@ extension ComparisonAudioServiceClient: DependencyKey {
                     durationSeconds: duration,
                     voiceID: voiceID,
                     model: modelID,
-                    generatedAt: now
+                    generatedAt: now,
+                    transcriptTurnTimings: transcriptTurnTimings
                 )
 
                 try await database.write { db in
@@ -128,6 +138,7 @@ extension ComparisonAudioServiceClient: DependencyKey {
                             $0.audioGeneratedAt = metadata.generatedAt
                             $0.audioVoiceID = metadata.voiceID
                             $0.audioModel = metadata.model
+                            $0.audioTranscriptTimingData = PodcastTranscriptTimingCodec.encode(metadata.transcriptTurnTimings)
                         }
                         .execute(db)
                 }
@@ -144,7 +155,8 @@ extension ComparisonAudioServiceClient: DependencyKey {
                     durationSeconds: 0,
                     voiceID: ComparisonAudioGeneratorClient.defaultVoiceID,
                     model: ComparisonAudioGeneratorClient.defaultModelID,
-                    generatedAt: Date()
+                    generatedAt: Date(),
+                    transcriptTurnTimings: []
                 )
             }
         )
@@ -160,45 +172,24 @@ extension DependencyValues {
     }
 }
 
-private func parsePodcastSegments(_ transcript: String) -> [PodcastAudioSegment] {
-    var segments: [PodcastAudioSegment] = []
-    var current: PodcastAudioSegment?
+private func makeTranscriptTurnTimings(
+    from turns: [PodcastTranscriptTurn],
+    segmentDurations: [Double]
+) -> [PodcastTranscriptTurnTiming] {
+    guard turns.count == segmentDurations.count else { return [] }
 
-    for rawLine in transcript.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline) {
-        let line = String(rawLine).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-        guard !line.isEmpty else { continue }
-
-        if line.hasPrefix("Alex (Male):") {
-            if let current {
-                segments.append(current)
-            }
-            let text = line.replacingOccurrences(of: "Alex (Male):", with: "")
-                .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-            current = .init(text: text, voiceID: ComparisonAudioServiceClient.podcastMaleVoiceID)
-            continue
-        }
-
-        if line.hasPrefix("Mia (Female):") {
-            if let current {
-                segments.append(current)
-            }
-            let text = line.replacingOccurrences(of: "Mia (Female):", with: "")
-                .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-            current = .init(text: text, voiceID: ComparisonAudioServiceClient.podcastFemaleVoiceID)
-            continue
-        }
-
-        if var updatedCurrent = current {
-            updatedCurrent.text += " " + line
-            current = updatedCurrent
-        }
+    var cursor: Double = 0
+    return zip(turns, segmentDurations).map { turn, rawDuration in
+        let duration = max(0, rawDuration)
+        let timing = PodcastTranscriptTurnTiming(
+            speaker: turn.speaker,
+            text: turn.text,
+            startSeconds: cursor,
+            endSeconds: cursor + duration
+        )
+        cursor += duration
+        return timing
     }
-
-    if let current {
-        segments.append(current)
-    }
-
-    return segments.filter { !$0.text.isEmpty }
 }
 
 private func mergeAudioFilesAsM4A(_ inputFiles: [URL]) async throws -> Data {

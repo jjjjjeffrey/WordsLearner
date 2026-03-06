@@ -49,21 +49,51 @@ struct ResponseDetailViewTests {
 #if os(macOS)
         let hosting = NSHostingController(rootView: view)
         let size = measuredFittingSize(for: view, width: 500)
+        if shouldRecord {
+            _ = verifySnapshot(
+                of: hosting,
+                as: .imageHiDPI(size: size),
+                named: name,
+                record: true,
+                file: file,
+                testName: testName
+            )
+            return
+        }
         let failure = verifySnapshot(
             of: hosting,
             as: .imageHiDPI(size: size),
             named: name,
-            record: shouldRecord,
+            record: false,
             file: file,
             testName: testName
         )
         #expect(failure == nil)
 #elseif os(iOS) || os(tvOS)
+        if shouldRecord {
+            _ = verifySnapshot(
+                of: view,
+                as: .image(traits: .init(userInterfaceStyle: .light)),
+                named: "\(name).light",
+                record: true,
+                file: file,
+                testName: testName
+            )
+            _ = verifySnapshot(
+                of: view,
+                as: .image(traits: .init(userInterfaceStyle: .dark)),
+                named: "\(name).dark",
+                record: true,
+                file: file,
+                testName: testName
+            )
+            return
+        }
         let lightFailure = verifySnapshot(
             of: view,
             as: .image(traits: .init(userInterfaceStyle: .light)),
             named: "\(name).light",
-            record: shouldRecord,
+            record: false,
             file: file,
             testName: testName
         )
@@ -72,7 +102,7 @@ struct ResponseDetailViewTests {
             of: view,
             as: .image(traits: .init(userInterfaceStyle: .dark)),
             named: "\(name).dark",
-            record: shouldRecord,
+            record: false,
             file: file,
             testName: testName
         )
@@ -150,7 +180,7 @@ struct ResponseDetailViewTests {
                 isGeneratingPodcastTranscript: true
             )
         )
-        assertSnapshots(view, name: "generatingAudio")
+        assertSnapshots(view, name: "generatingAudioV2")
     }
 
     @Test
@@ -172,7 +202,7 @@ struct ResponseDetailViewTests {
                 """
             )
         )
-        assertSnapshots(view, name: "audioReady")
+        assertSnapshots(view, name: "audioReadyV2")
     }
 
     @Test
@@ -191,5 +221,152 @@ struct ResponseDetailViewTests {
             )
         )
         assertSnapshots(view, name: "audioErrors")
+    }
+
+    @Test
+    func responseDetailViewAudioPlaybackNowSpeaking() async {
+        let view = makeView(
+            state: ResponseDetailFeature.State(
+                word1: "affect",
+                word2: "effect",
+                sentence: "The policy will affect the final effect.",
+                comparisonID: UUID(),
+                streamingResponse: "## Analysis\n\n- point 1\n- point 2",
+                attributedString: AttributedString("Analysis"),
+                shouldStartStreaming: false,
+                audioRelativePath: "ComparisonAudio/ready.m4a",
+                audioDurationSeconds: 93,
+                podcastTranscript: """
+                Alex (Male): Let's walk through this.
+                Mia (Female): Great, let's cover every example.
+                """,
+                transcriptTurnTimings: [
+                    PodcastTranscriptTurnTiming(
+                        speaker: "Alex (Male)",
+                        text: "Let's walk through this.",
+                        startSeconds: 0,
+                        endSeconds: 42
+                    ),
+                    PodcastTranscriptTurnTiming(
+                        speaker: "Mia (Female)",
+                        text: "Great, let's cover every example.",
+                        startSeconds: 42,
+                        endSeconds: 93
+                    ),
+                ],
+                isAudioPlaying: true,
+                currentAudioTimeSeconds: 20,
+                currentSpeakerTurnText: "Alex (Male): Let's walk through this."
+            )
+        )
+        assertSnapshots(view, name: "audioPlaybackNowSpeaking")
+    }
+
+    @Test
+    func responseDetailViewAudioPlaybackPausedAtCurrentTurn() async {
+        let view = makeView(
+            state: ResponseDetailFeature.State(
+                word1: "affect",
+                word2: "effect",
+                sentence: "The policy will affect the final effect.",
+                comparisonID: UUID(),
+                streamingResponse: "## Analysis\n\n- point 1\n- point 2",
+                attributedString: AttributedString("Analysis"),
+                shouldStartStreaming: false,
+                audioRelativePath: "ComparisonAudio/ready.m4a",
+                audioDurationSeconds: 93,
+                podcastTranscript: """
+                Alex (Male): Let's walk through this.
+                Mia (Female): Great, let's cover every example.
+                """,
+                transcriptTurnTimings: [
+                    PodcastTranscriptTurnTiming(
+                        speaker: "Alex (Male)",
+                        text: "Let's walk through this.",
+                        startSeconds: 0,
+                        endSeconds: 42
+                    ),
+                    PodcastTranscriptTurnTiming(
+                        speaker: "Mia (Female)",
+                        text: "Great, let's cover every example.",
+                        startSeconds: 42,
+                        endSeconds: 93
+                    ),
+                ],
+                isAudioPlaying: false,
+                currentAudioTimeSeconds: 60,
+                currentSpeakerTurnText: "Mia (Female): Great, let's cover every example."
+            )
+        )
+        assertSnapshots(view, name: "audioPlaybackPausedAt")
+    }
+
+    @Test
+    func responseDetailViewAudioPlaybackFinishedClearsCurrentTurn() async {
+        let view = makeView(
+            state: ResponseDetailFeature.State(
+                word1: "affect",
+                word2: "effect",
+                sentence: "The policy will affect the final effect.",
+                comparisonID: UUID(),
+                streamingResponse: "## Analysis\n\n- point 1\n- point 2",
+                attributedString: AttributedString("Analysis"),
+                shouldStartStreaming: false,
+                audioRelativePath: "ComparisonAudio/ready.m4a",
+                audioDurationSeconds: 93,
+                podcastTranscript: """
+                Alex (Male): Let's walk through this.
+                Mia (Female): Great, let's cover every example.
+                """,
+                transcriptTurnTimings: [
+                    PodcastTranscriptTurnTiming(
+                        speaker: "Alex (Male)",
+                        text: "Let's walk through this.",
+                        startSeconds: 0,
+                        endSeconds: 42
+                    ),
+                    PodcastTranscriptTurnTiming(
+                        speaker: "Mia (Female)",
+                        text: "Great, let's cover every example.",
+                        startSeconds: 42,
+                        endSeconds: 93
+                    ),
+                ],
+                isAudioPlaying: false,
+                currentAudioTimeSeconds: 0,
+                currentSpeakerTurnText: nil
+            )
+        )
+        assertSnapshots(view, name: "audioPlaybackFinishedCleared")
+    }
+
+    @Test
+    func responseDetailViewAudioRegeneratingAfterPlaybackReset() async {
+        let view = makeView(
+            state: ResponseDetailFeature.State(
+                word1: "affect",
+                word2: "effect",
+                sentence: "The policy will affect the final effect.",
+                comparisonID: UUID(),
+                streamingResponse: "## Analysis\n\n- point 1\n- point 2",
+                attributedString: AttributedString("Analysis"),
+                shouldStartStreaming: false,
+                audioRelativePath: "ComparisonAudio/ready.m4a",
+                audioDurationSeconds: 93,
+                isGeneratingAudio: true,
+                audioGenerationProgress: 0.6,
+                audioGenerationStatusMessage: "Generating audio...",
+                podcastTranscript: """
+                Alex (Male): Let's walk through this.
+                Mia (Female): Great, let's cover every example.
+                """,
+                isGeneratingPodcastTranscript: true,
+                transcriptTurnTimings: [],
+                isAudioPlaying: false,
+                currentAudioTimeSeconds: 0,
+                currentSpeakerTurnText: nil
+            )
+        )
+        assertSnapshots(view, name: "audioRegeneratingReset")
     }
 }

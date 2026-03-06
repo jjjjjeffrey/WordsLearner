@@ -82,7 +82,21 @@ struct WordComparatorFeatureTests {
                 audioDurationSeconds: 12.34,
                 audioGeneratedAt: seedBaseDate,
                 audioVoiceID: "male+female",
-                audioModel: "eleven_multilingual_v2"
+                audioModel: "eleven_multilingual_v2",
+                audioTranscriptTimingData: PodcastTranscriptTimingCodec.encode([
+                    PodcastTranscriptTurnTiming(
+                        speaker: "Alex (Male)",
+                        text: "A",
+                        startSeconds: 0,
+                        endSeconds: 6.17
+                    ),
+                    PodcastTranscriptTurnTiming(
+                        speaker: "Mia (Female)",
+                        text: "B",
+                        startSeconds: 6.17,
+                        endSeconds: 12.34
+                    ),
+                ])
             )
         }
     }
@@ -273,7 +287,21 @@ struct WordComparatorFeatureTests {
                 shouldStartStreaming: false,
                 audioRelativePath: "ComparisonAudio/\(id.uuidString).m4a",
                 audioDurationSeconds: 12.34,
-                podcastTranscript: "Alex (Male): A\nMia (Female): B"
+                podcastTranscript: "Alex (Male): A\nMia (Female): B",
+                transcriptTurnTimings: [
+                    PodcastTranscriptTurnTiming(
+                        speaker: "Alex (Male)",
+                        text: "A",
+                        startSeconds: 0,
+                        endSeconds: 6.17
+                    ),
+                    PodcastTranscriptTurnTiming(
+                        speaker: "Mia (Female)",
+                        text: "B",
+                        startSeconds: 6.17,
+                        endSeconds: 12.34
+                    ),
+                ]
             )
             $0.detailPresentationToken = 1
         }

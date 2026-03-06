@@ -313,6 +313,7 @@ struct WordComparatorFeature {
             audioDurationSeconds: comparison.audioDurationSeconds
         )
         detailState.podcastTranscript = comparison.podcastTranscript ?? ""
+        detailState.transcriptTurnTimings = PodcastTranscriptTimingCodec.decode(comparison.audioTranscriptTimingData)
         return detailState
     }
 
