@@ -18,7 +18,6 @@ import Testing
 @MainActor
 @Suite
 struct ResponseDetailViewTests {
-
     private func makeView(
         state: ResponseDetailFeature.State
     ) -> some View {
@@ -26,6 +25,7 @@ struct ResponseDetailViewTests {
             ResponseDetailFeature()
         } withDependencies: {
             $0.comparisonGenerator = .testValue
+            $0.comparisonAudioRemoteControl = .testValue
         }
 
         return NavigationStack {
@@ -142,6 +142,7 @@ struct ResponseDetailViewTests {
             ResponseDetailFeature()
         } withDependencies: {
             $0.comparisonGenerator = .testValue
+            $0.comparisonAudioRemoteControl = .testValue
         }
 
         store.send(.onAppear)
@@ -206,6 +207,25 @@ struct ResponseDetailViewTests {
     }
 
     @Test
+    func responseDetailViewRestoredAudioWithoutTranscriptMetadata() async {
+        let view = makeView(
+            state: ResponseDetailFeature.State(
+                word1: "affect",
+                word2: "effect",
+                sentence: "The policy will affect the final effect.",
+                comparisonID: UUID(),
+                streamingResponse: "## Analysis\n\n- point 1\n- point 2",
+                attributedString: AttributedString("Analysis"),
+                shouldStartStreaming: false,
+                audioRelativePath: "ComparisonAudio/restored.m4a",
+                audioDurationSeconds: 327,
+                currentAudioTimeSeconds: 17
+            )
+        )
+        assertSnapshots(view, name: "audioReadyWithoutTranscriptMetadata")
+    }
+
+    @Test
     func responseDetailViewAudioAndTranscriptErrors() async {
         let view = makeView(
             state: ResponseDetailFeature.State(
@@ -256,6 +276,7 @@ struct ResponseDetailViewTests {
                 ],
                 isAudioPlaying: true,
                 currentAudioTimeSeconds: 20,
+                currentSpeakerTurnIndex: 0,
                 currentSpeakerTurnText: "Alex (Male): Let's walk through this."
             )
         )
@@ -295,6 +316,7 @@ struct ResponseDetailViewTests {
                 ],
                 isAudioPlaying: false,
                 currentAudioTimeSeconds: 60,
+                currentSpeakerTurnIndex: 1,
                 currentSpeakerTurnText: "Mia (Female): Great, let's cover every example."
             )
         )

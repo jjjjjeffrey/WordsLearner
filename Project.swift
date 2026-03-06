@@ -3,7 +3,7 @@ import ProjectDescription
 let appInfoPlist: InfoPlist = .extendingDefault(with: [
     "CFBundleShortVersionString": "$(MARKETING_VERSION)",
     "CFBundleVersion": "$(CURRENT_PROJECT_VERSION)",
-    "UIBackgroundModes": ["fetch", "remote-notification"],
+    "UIBackgroundModes": ["audio", "fetch", "remote-notification"],
     "ITSAppUsesNonExemptEncryption": false,
     "LSApplicationCategoryType": "public.app-category.productivity",
     "UIApplicationSceneManifest": [

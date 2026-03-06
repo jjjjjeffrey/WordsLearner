@@ -100,6 +100,7 @@ struct WordComparatorFeature {
     
     @Dependency(\.apiKeyManager) var apiKeyManager
     @Dependency(\.backgroundTaskManager) var taskManager
+    @Dependency(\.comparisonAudioPlayback) var comparisonAudioPlayback
     @Dependency(\.defaultDatabase) var database
     @Dependency(\.lastReadComparisonStore) var lastReadComparisonStore
     
@@ -144,7 +145,12 @@ struct WordComparatorFeature {
             case let .lastReadComparisonLoaded(comparison):
                 guard state.sidebarSelection == .history, let comparison else { return .none }
                 showDetail(&state, makeDetailState(for: comparison))
-                return .send(.detail(.hydrateStoredResponse))
+                return .concatenate(
+                    .run { [comparisonAudioPlayback] _ in
+                        await comparisonAudioPlayback.stop(true)
+                    },
+                    .send(.detail(.hydrateStoredResponse))
+                )
 
             case .newComparisonButtonTapped:
                 state.isComposerSheetPresented = true
@@ -157,7 +163,9 @@ struct WordComparatorFeature {
             case .backgroundTasksButtonTapped:
                 state.sidebarSelection = .backgroundTasks
                 activateSelection(&state)
-                return .none
+                return .run { [comparisonAudioPlayback] _ in
+                    await comparisonAudioPlayback.stop(true)
+                }
                 
             case .generateButtonTapped:
                 guard state.canGenerate && state.hasValidAPIKey else { return .none }
@@ -177,6 +185,9 @@ struct WordComparatorFeature {
                 )
 
                 return .concatenate(
+                    .run { [comparisonAudioPlayback] _ in
+                        await comparisonAudioPlayback.stop(true)
+                    },
                     .send(.clearInputFields),
                     .send(.detail(.startStreaming))
                 )
@@ -220,19 +231,33 @@ struct WordComparatorFeature {
             case let .historyList(.delegate(.comparisonSelected(comparison))):
                 lastReadComparisonStore.set(comparison.id.uuidString)
                 showDetail(&state, makeDetailState(for: comparison))
-                return .send(.detail(.hydrateStoredResponse))
+                return .concatenate(
+                    .run { [comparisonAudioPlayback] _ in
+                        await comparisonAudioPlayback.stop(true)
+                    },
+                    .send(.detail(.hydrateStoredResponse))
+                )
 
             case let .backgroundTasks(.delegate(.comparisonSelected(comparison))):
                 showDetail(&state, makeDetailState(for: comparison))
-                return .send(.detail(.hydrateStoredResponse))
+                return .concatenate(
+                    .run { [comparisonAudioPlayback] _ in
+                        await comparisonAudioPlayback.stop(true)
+                    },
+                    .send(.detail(.hydrateStoredResponse))
+                )
 
             case let .detail(.comparisonSaved(id)):
                 state.detail?.comparisonID = id
                 return .none
 
             case .binding(\.sidebarSelection):
+                let shouldStopPlayback = state.sidebarSelection != .history
                 activateSelection(&state)
-                return .none
+                guard shouldStopPlayback else { return .none }
+                return .run { [comparisonAudioPlayback] _ in
+                    await comparisonAudioPlayback.stop(true)
+                }
 
             case .historyList:
                 return .none
@@ -245,7 +270,9 @@ struct WordComparatorFeature {
 
             case .detailDismissed:
                 state.detail = nil
-                return .none
+                return .run { [comparisonAudioPlayback] _ in
+                    await comparisonAudioPlayback.stop(true)
+                }
                 
             case .settings:
                 return .none

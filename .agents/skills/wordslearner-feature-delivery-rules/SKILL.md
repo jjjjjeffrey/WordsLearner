@@ -116,6 +116,51 @@ If a feature touches storage, networking, media, or snapshots, validate macOS ex
 
 Do not assume TCA state replacement is enough if the actual side-effectful object lives in the view layer.
 
+### 9. Compact and full-content surfaces must be intentionally split
+
+- If a screen has a primary interactive artifact plus long-form supporting content, keep the primary card focused and move the long-form content into an explicit destination.
+- Do not leave duplicate passive cards on the detail screen once a full transcript/detail view exists.
+- Decide early which content remains inline for fast interaction and which content belongs behind "View Full ..." navigation.
+
+Good pattern:
+
+- audio card shows playback actions, progress, and previous/current/next turns
+- full transcript opens in a dedicated destination
+- compact analysis section opens a dedicated markdown detail once audio becomes primary
+
+Bad pattern:
+
+- primary card plus a second passive card that repeats the same artifact in longer form
+
+### 10. Cross-platform control density must be validated explicitly
+
+- Do not assume the same button labels, hit areas, or control layouts fit both macOS and iPhone-sized screens.
+- Validate iPhone-width layouts before finalizing any control row that mixes buttons with status text.
+- For this repo's snapshot/manual validation default, use `iPhone 12 Pro` on `iOS 26.2` unless the feature explicitly requires another device.
+- When compact iOS controls become icon-only, add explicit accessibility labels.
+
+Good pattern:
+
+- macOS keeps icon-plus-text controls where width is available
+- iOS uses icon-only controls when labels would wrap or distort the row
+
+Bad pattern:
+
+- shipping a single control style that looks fine on macOS but wraps or compresses on iPhone
+
+### 11. Media integrations require simulator and device validation separately
+
+- Treat simulator and real-device checks as different layers of validation.
+- Use simulator for layout, local playback, and reducer/view wiring.
+- Use real devices for Lock Screen, Control Center, remote commands, and background-media UX.
+
+Do not conclude a media integration is broken solely because the simulator does not expose system media controls.
+
+### 12. Generated workspaces must be regenerated when adding app sources
+
+- If a new source file is added to the app or tests, run `tuist generate` before trusting missing-type build failures.
+- Prefer ruling out stale generated projects early instead of debugging false compile errors.
+
 ## Implementation Checklist
 
 When adding a new WordsLearner feature, check these in order:
@@ -131,6 +176,10 @@ When adding a new WordsLearner feature, check these in order:
 9. Add snapshot coverage for every meaningful UI status.
 10. Manually test cross-item transitions for media/controller features: open A, start, pause or interrupt, switch to B, start again, and confirm the active resource belongs to B.
 11. Run tests on both macOS and iOS before considering the feature complete.
+12. For cross-platform UI, verify that control density and button labels work on iPhone-sized layouts, not just macOS.
+13. Default iOS snapshot and manual UI validation to `iPhone 12 Pro` on `iOS 26.2` unless another target is required.
+14. For media features, validate device-only behaviors separately from simulator-only checks.
+15. Regenerate the Tuist workspace immediately after adding new app/test files.
 
 ## Testing Requirements
 
@@ -141,6 +190,7 @@ For non-trivial feature work, aim for all of the following:
 - reducer tests for failure paths
 - service tests for persistence/update semantics
 - snapshot tests for each major screen state
+- snapshot tests for compact and full-content destinations when the UI intentionally splits them
 - manual validation for restore/reopen behavior when history is involved
 
 If a view has multiple user-visible states, snapshot all of them. Do not stop at the default state.

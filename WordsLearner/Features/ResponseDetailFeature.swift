@@ -36,8 +36,10 @@ struct ResponseDetailFeature {
         var transcriptTurnTimings: [PodcastTranscriptTurnTiming] = []
         var isAudioPlaying: Bool = false
         var currentAudioTimeSeconds: Double = 0
+        var currentSpeakerTurnIndex: Int? = nil
         var currentSpeakerTurnText: String? = nil
         @Presents var markdownDetail: MarkdownDetailFeature.State?
+        @Presents var transcriptDetail: PodcastTranscriptDetailFeature.State?
     }
     
     enum Action: Equatable {
@@ -56,6 +58,12 @@ struct ResponseDetailFeature {
         case audioGenerationSucceeded(ComparisonAudioMetadata)
         case audioGenerationFailed(String)
         case audioPlaybackToggled
+        case audioPlaybackSnapshotReceived(ComparisonAudioPlaybackClient.Snapshot)
+        case audioPlaybackEventReceived(ComparisonAudioPlaybackClient.Event)
+        case audioRemoteCommandReceived(ComparisonAudioRemoteControlClient.Command)
+        case audioJumpToPreviousTurn
+        case audioJumpToNextTurn
+        case audioJumpToTurn(Int)
         case audioPlaybackStarted
         case audioPlaybackProgressUpdated(Double)
         case audioPlaybackPaused
@@ -65,25 +73,56 @@ struct ResponseDetailFeature {
         case podcastTranscriptSucceeded(String)
         case podcastTranscriptFailed(String)
         case markdownDetailButtonTapped
+        case transcriptDetailButtonTapped
         case markdownDetail(PresentationAction<MarkdownDetailFeature.Action>)
+        case transcriptDetail(PresentationAction<PodcastTranscriptDetailFeature.Action>)
     }
     
     @Dependency(\.comparisonGenerator) var generator
     @Dependency(\.comparisonAudioService) var comparisonAudioService
     @Dependency(ComparisonPodcastTranscriptClient.self) var comparisonPodcastTranscript
+    @Dependency(\.comparisonAudioAssetStore) var comparisonAudioAssetStore
+    @Dependency(\.comparisonAudioPlayback) var comparisonAudioPlayback
+    @Dependency(\.comparisonAudioRemoteControl) var comparisonAudioRemoteControl
     @Dependency(\.platformShare) var platformShare
+
+    enum CancelID: Sendable {
+        case playbackEvents
+        case remoteCommands
+    }
     
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
             case .onAppear:
+                var effects: [Effect<Action>] = [
+                    .run { [comparisonAudioPlayback] send in
+                        let snapshot = await comparisonAudioPlayback.snapshot()
+                        await send(.audioPlaybackSnapshotReceived(snapshot))
+                    },
+                    .run { [comparisonAudioPlayback] send in
+                        let events = await comparisonAudioPlayback.events()
+                        for await event in events {
+                            await send(.audioPlaybackEventReceived(event))
+                        }
+                    }
+                    .cancellable(id: CancelID.playbackEvents, cancelInFlight: true),
+                    .run { [comparisonAudioRemoteControl] send in
+                        let commands = await comparisonAudioRemoteControl.commands()
+                        for await command in commands {
+                            await send(.audioRemoteCommandReceived(command))
+                        }
+                    }
+                    .cancellable(id: CancelID.remoteCommands, cancelInFlight: true)
+                ]
                 if state.shouldStartStreaming, !state.isStreaming, state.streamingResponse.isEmpty {
-                    return .send(.startStreaming)
+                    effects.append(.send(.startStreaming))
                 }
                 if !state.streamingResponse.isEmpty, state.attributedString.characters.isEmpty {
-                    return .send(.hydrateStoredResponse)
+                    effects.append(.send(.hydrateStoredResponse))
                 }
-                return .none
+                effects.append(updateNowPlayingEffect(state, remoteControl: comparisonAudioRemoteControl))
+                return .merge(effects)
 
             case .hydrateStoredResponse:
                 guard !state.streamingResponse.isEmpty else {
@@ -177,8 +216,13 @@ struct ResponseDetailFeature {
                 state.shouldAutoPlayAfterAudioReady = false
                 state.isAudioPlaying = false
                 state.currentAudioTimeSeconds = 0
+                state.currentSpeakerTurnIndex = nil
                 state.currentSpeakerTurnText = nil
-                return .run {
+                return .merge(
+                    .run { [comparisonAudioPlayback] _ in
+                        await comparisonAudioPlayback.stop(true)
+                    },
+                    .run {
                     [
                         comparisonAudioService,
                         comparisonPodcastTranscript,
@@ -195,6 +239,7 @@ struct ResponseDetailFeature {
                         await send(.audioGenerationFailed(error.localizedDescription))
                     }
                 }
+                )
 
             case let .audioGenerationProgressUpdated(progress, message):
                 state.audioGenerationProgress = max(0, min(1, progress))
@@ -211,7 +256,7 @@ struct ResponseDetailFeature {
                 state.transcriptTurnTimings = metadata.transcriptTurnTimings
                 state.audioErrorMessage = nil
                 state.shouldAutoPlayAfterAudioReady = true
-                return .none
+                return .send(.audioPlaybackToggled)
 
             case let .audioGenerationFailed(message):
                 state.isGeneratingAudio = false
@@ -223,24 +268,186 @@ struct ResponseDetailFeature {
 
             case .audioPlaybackToggled:
                 state.shouldAutoPlayAfterAudioReady = false
-                return .none
+                guard let relativePath = state.audioRelativePath else { return .none }
+                if state.isAudioPlaying {
+                    return .run {
+                        [
+                            comparisonAudioPlayback,
+                            comparisonAudioRemoteControl,
+                            word1 = state.word1,
+                            word2 = state.word2,
+                            sentence = state.sentence,
+                            currentSpeakerTurnText = state.currentSpeakerTurnText,
+                            audioDurationSeconds = state.audioDurationSeconds,
+                            currentAudioTimeSeconds = state.currentAudioTimeSeconds
+                        ] _ in
+                        await comparisonAudioPlayback.pause()
+                        await comparisonAudioRemoteControl.updateNowPlaying(
+                            makeNowPlayingMetadata(
+                                title: "\(word1) vs \(word2)",
+                                subtitle: currentSpeakerTurnText ?? sentence,
+                                durationSeconds: audioDurationSeconds,
+                                elapsedTimeSeconds: currentAudioTimeSeconds,
+                                isPlaying: false
+                            )
+                        )
+                    }
+                }
+                return .run {
+                    [
+                        comparisonAudioAssetStore,
+                        comparisonAudioPlayback,
+                        comparisonAudioRemoteControl,
+                        relativePath,
+                        currentTimeSeconds = state.currentAudioTimeSeconds,
+                        word1 = state.word1,
+                        word2 = state.word2,
+                        sentence = state.sentence,
+                        currentSpeakerTurnText = state.currentSpeakerTurnText,
+                        audioDurationSeconds = state.audioDurationSeconds
+                    ] _ in
+                    guard let data = try? comparisonAudioAssetStore.loadAudioData(relativePath) else { return }
+                    await comparisonAudioRemoteControl.activateAudioSession()
+                    await comparisonAudioRemoteControl.updateNowPlaying(
+                        makeNowPlayingMetadata(
+                            title: "\(word1) vs \(word2)",
+                            subtitle: currentSpeakerTurnText ?? sentence,
+                            durationSeconds: audioDurationSeconds,
+                            elapsedTimeSeconds: currentTimeSeconds,
+                            isPlaying: true
+                        )
+                    )
+                    await comparisonAudioPlayback.play(data, relativePath, currentTimeSeconds)
+                }
+
+            case let .audioPlaybackSnapshotReceived(snapshot):
+                guard snapshot.sourceID == state.audioRelativePath else {
+                    state.isAudioPlaying = false
+                    return .none
+                }
+                state.currentAudioTimeSeconds = snapshot.currentTimeSeconds
+                state.isAudioPlaying = snapshot.isPlaying
+                updateActiveSpeakerTurn(state: &state)
+                return updateNowPlayingEffect(state, remoteControl: comparisonAudioRemoteControl)
+
+            case let .audioPlaybackEventReceived(event):
+                switch event {
+                case let .started(sourceID, currentTimeSeconds):
+                    guard sourceID == state.audioRelativePath else { return .none }
+                    state.shouldAutoPlayAfterAudioReady = false
+                    state.isAudioPlaying = true
+                    state.currentAudioTimeSeconds = currentTimeSeconds
+                    updateActiveSpeakerTurn(state: &state)
+                    return updateNowPlayingEffect(state, remoteControl: comparisonAudioRemoteControl)
+
+                case let .progressUpdated(sourceID, currentTimeSeconds):
+                    guard sourceID == state.audioRelativePath else { return .none }
+                    state.currentAudioTimeSeconds = max(0, currentTimeSeconds)
+                    updateActiveSpeakerTurn(state: &state)
+                    return updateNowPlayingEffect(state, remoteControl: comparisonAudioRemoteControl)
+
+                case let .paused(sourceID, currentTimeSeconds):
+                    guard sourceID == state.audioRelativePath else { return .none }
+                    state.shouldAutoPlayAfterAudioReady = false
+                    state.isAudioPlaying = false
+                    state.currentAudioTimeSeconds = currentTimeSeconds
+                    updateActiveSpeakerTurn(state: &state)
+                    return updateNowPlayingEffect(state, remoteControl: comparisonAudioRemoteControl)
+
+                case .stopped:
+                    state.shouldAutoPlayAfterAudioReady = false
+                    state.isAudioPlaying = false
+                    state.currentAudioTimeSeconds = 0
+                    state.currentSpeakerTurnIndex = nil
+                    state.currentSpeakerTurnText = nil
+                    return .run { [comparisonAudioRemoteControl] _ in
+                        await comparisonAudioRemoteControl.clearNowPlaying()
+                    }
+
+                case let .finished(sourceID):
+                    guard sourceID == state.audioRelativePath else { return .none }
+                    state.shouldAutoPlayAfterAudioReady = false
+                    state.isAudioPlaying = false
+                    state.currentAudioTimeSeconds = 0
+                    state.currentSpeakerTurnIndex = nil
+                    state.currentSpeakerTurnText = nil
+                    return .run { [comparisonAudioRemoteControl] _ in
+                        await comparisonAudioRemoteControl.clearNowPlaying()
+                    }
+                }
+
+            case let .audioRemoteCommandReceived(command):
+                switch command {
+                case .togglePlayPause:
+                    return .send(.audioPlaybackToggled)
+                case .play:
+                    return state.isAudioPlaying ? .none : .send(.audioPlaybackToggled)
+                case .pause:
+                    return state.isAudioPlaying ? .send(.audioPlaybackToggled) : .none
+                case .previous:
+                    return .send(.audioJumpToPreviousTurn)
+                case .next:
+                    return .send(.audioJumpToNextTurn)
+                }
+
+            case .audioJumpToPreviousTurn:
+                guard let activeTurnIndex = state.currentSpeakerTurnIndex, activeTurnIndex > 0 else {
+                    return .none
+                }
+                return .send(.audioJumpToTurn(activeTurnIndex - 1))
+
+            case .audioJumpToNextTurn:
+                guard let activeTurnIndex = state.currentSpeakerTurnIndex, activeTurnIndex + 1 < state.transcriptTurnTimings.count else {
+                    return .none
+                }
+                return .send(.audioJumpToTurn(activeTurnIndex + 1))
+
+            case let .audioJumpToTurn(index):
+                guard
+                    state.transcriptTurnTimings.indices.contains(index),
+                    let relativePath = state.audioRelativePath,
+                    let data = try? comparisonAudioAssetStore.loadAudioData(relativePath)
+                else {
+                    return .none
+                }
+                let targetTime = state.transcriptTurnTimings[index].startSeconds
+                state.currentAudioTimeSeconds = targetTime
+                updateActiveSpeakerTurn(state: &state)
+                return .run {
+                    [
+                        comparisonAudioPlayback,
+                        comparisonAudioRemoteControl,
+                        data,
+                        relativePath,
+                        targetTime,
+                        word1 = state.word1,
+                        word2 = state.word2,
+                        currentSpeakerTurnText = state.currentSpeakerTurnText,
+                        sentence = state.sentence,
+                        audioDurationSeconds = state.audioDurationSeconds
+                    ] _ in
+                    await comparisonAudioRemoteControl.activateAudioSession()
+                    await comparisonAudioRemoteControl.updateNowPlaying(
+                        makeNowPlayingMetadata(
+                            title: "\(word1) vs \(word2)",
+                            subtitle: currentSpeakerTurnText ?? sentence,
+                            durationSeconds: audioDurationSeconds,
+                            elapsedTimeSeconds: targetTime,
+                            isPlaying: true
+                        )
+                    )
+                    await comparisonAudioPlayback.play(data, relativePath, targetTime)
+                }
 
             case .audioPlaybackStarted:
                 state.shouldAutoPlayAfterAudioReady = false
                 state.isAudioPlaying = true
-                if let currentTurn = activeSpeakerTurn(for: state.currentAudioTimeSeconds, timings: state.transcriptTurnTimings) {
-                    state.currentSpeakerTurnText = currentTurn.displayText
-                }
+                updateActiveSpeakerTurn(state: &state)
                 return .none
 
             case let .audioPlaybackProgressUpdated(currentTime):
                 state.currentAudioTimeSeconds = max(0, currentTime)
-                if let currentTurn = activeSpeakerTurn(
-                    for: state.currentAudioTimeSeconds,
-                    timings: state.transcriptTurnTimings
-                ) {
-                    state.currentSpeakerTurnText = currentTurn.displayText
-                }
+                updateActiveSpeakerTurn(state: &state)
                 return .none
 
             case .audioPlaybackPaused:
@@ -252,12 +459,15 @@ struct ResponseDetailFeature {
                 state.shouldAutoPlayAfterAudioReady = false
                 state.isAudioPlaying = false
                 state.currentAudioTimeSeconds = 0
+                state.currentSpeakerTurnIndex = nil
                 state.currentSpeakerTurnText = nil
                 return .none
 
             case .audioPlaybackStopped:
                 state.shouldAutoPlayAfterAudioReady = false
                 state.isAudioPlaying = false
+                state.currentSpeakerTurnIndex = nil
+                state.currentSpeakerTurnText = nil
                 return .none
 
             case .generatePodcastTranscriptButtonTapped:
@@ -299,7 +509,23 @@ struct ResponseDetailFeature {
                 )
                 return .none
 
+            case .transcriptDetailButtonTapped:
+                guard
+                    !state.podcastTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    || !state.transcriptTurnTimings.isEmpty
+                else {
+                    return .none
+                }
+                state.transcriptDetail = PodcastTranscriptDetailFeature.State(
+                    transcript: state.podcastTranscript,
+                    turns: state.transcriptTurnTimings
+                )
+                return .none
+
             case .markdownDetail:
+                return .none
+
+            case .transcriptDetail:
                 return .none
 
             case .shareButtonTapped:
@@ -319,6 +545,9 @@ struct ResponseDetailFeature {
         .ifLet(\.$markdownDetail, action: \.markdownDetail) {
             MarkdownDetailFeature()
         }
+        .ifLet(\.$transcriptDetail, action: \.transcriptDetail) {
+            PodcastTranscriptDetailFeature()
+        }
     }
 }
 
@@ -331,4 +560,66 @@ private func activeSpeakerTurn(
         return exact
     }
     return timings.last(where: { timeSeconds >= $0.startSeconds })
+}
+
+private func activeSpeakerTurnIndex(
+    for timeSeconds: Double,
+    timings: [PodcastTranscriptTurnTiming]
+) -> Int? {
+    guard !timings.isEmpty else { return nil }
+    if let exactIndex = timings.firstIndex(where: { $0.contains(timeSeconds: timeSeconds) }) {
+        return exactIndex
+    }
+    return timings.lastIndex(where: { timeSeconds >= $0.startSeconds })
+}
+
+private func updateActiveSpeakerTurn(state: inout ResponseDetailFeature.State) {
+    guard let index = activeSpeakerTurnIndex(
+        for: state.currentAudioTimeSeconds,
+        timings: state.transcriptTurnTimings
+    ) else {
+        state.currentSpeakerTurnIndex = nil
+        state.currentSpeakerTurnText = nil
+        return
+    }
+
+    state.currentSpeakerTurnIndex = index
+    state.currentSpeakerTurnText = state.transcriptTurnTimings[index].displayText
+}
+
+private func updateNowPlayingEffect(
+    _ state: ResponseDetailFeature.State,
+    remoteControl: ComparisonAudioRemoteControlClient
+) -> Effect<ResponseDetailFeature.Action> {
+    guard state.audioRelativePath != nil else {
+        return .run { _ in
+            await remoteControl.clearNowPlaying()
+        }
+    }
+    let metadata = makeNowPlayingMetadata(
+        title: "\(state.word1) vs \(state.word2)",
+        subtitle: state.currentSpeakerTurnText ?? state.sentence,
+        durationSeconds: state.audioDurationSeconds,
+        elapsedTimeSeconds: state.currentAudioTimeSeconds,
+        isPlaying: state.isAudioPlaying
+    )
+    return .run { _ in
+        await remoteControl.updateNowPlaying(metadata)
+    }
+}
+
+private func makeNowPlayingMetadata(
+    title: String,
+    subtitle: String,
+    durationSeconds: Double?,
+    elapsedTimeSeconds: Double,
+    isPlaying: Bool
+) -> ComparisonAudioRemoteControlClient.Metadata {
+    ComparisonAudioRemoteControlClient.Metadata(
+        title: title,
+        subtitle: subtitle,
+        durationSeconds: durationSeconds,
+        elapsedTimeSeconds: elapsedTimeSeconds,
+        isPlaying: isPlaying
+    )
 }

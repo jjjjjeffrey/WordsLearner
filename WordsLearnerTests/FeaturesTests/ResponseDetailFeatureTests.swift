@@ -36,15 +36,16 @@ struct ResponseDetailFeatureTests {
                     return savedID
                 }
             )
+            $0.comparisonAudioRemoteControl = .testValue
         }
         
         await store.send(.onAppear)
-        
         await store.receive(.startStreaming) {
             $0.isStreaming = true
             $0.errorMessage = nil
             $0.shouldStartStreaming = false
         }
+        await store.receive(.audioPlaybackSnapshotReceived(.init(sourceID: nil, isPlaying: false, currentTimeSeconds: 0)))
         
         // Send first chunk
         let string = "First chunk "
@@ -82,9 +83,12 @@ struct ResponseDetailFeatureTests {
             shouldStartStreaming: false
         )) {
             ResponseDetailFeature()
+        } withDependencies: {
+            $0.comparisonAudioRemoteControl = .testValue
         }
         
         await store.send(.onAppear)
+        await store.receive(.audioPlaybackSnapshotReceived(.init(sourceID: nil, isPlaying: false, currentTimeSeconds: 0)))
     }
     
     @Test
@@ -97,6 +101,8 @@ struct ResponseDetailFeatureTests {
             shouldStartStreaming: false
         )) {
             ResponseDetailFeature()
+        } withDependencies: {
+            $0.comparisonAudioRemoteControl = .testValue
         }
         
         await store.send(.onAppear)
@@ -105,6 +111,7 @@ struct ResponseDetailFeatureTests {
         await store.receive(.attributedStringRendered(rendered)) {
             $0.attributedString = rendered
         }
+        await store.receive(.audioPlaybackSnapshotReceived(.init(sourceID: nil, isPlaying: false, currentTimeSeconds: 0)))
     }
     
     // MARK: - Streaming Flow Tests
@@ -450,6 +457,7 @@ struct ResponseDetailFeatureTests {
                 #expect(markdown == transcript)
                 return metadata
             }
+            $0.comparisonAudioRemoteControl = .testValue
         }
 
         await store.send(.generateAudioButtonTapped) {
@@ -481,6 +489,9 @@ struct ResponseDetailFeatureTests {
             $0.audioRelativePath = metadata.relativePath
             $0.audioDurationSeconds = metadata.durationSeconds
             $0.shouldAutoPlayAfterAudioReady = true
+        }
+        await store.receive(.audioPlaybackToggled) {
+            $0.shouldAutoPlayAfterAudioReady = false
         }
     }
 
@@ -593,6 +604,7 @@ struct ResponseDetailFeatureTests {
                 #expect(source == newPodcastTranscript)
                 return metadata
             }
+            $0.comparisonAudioRemoteControl = .testValue
         }
 
         await store.send(.generateAudioButtonTapped) {
@@ -625,6 +637,9 @@ struct ResponseDetailFeatureTests {
             $0.audioDurationSeconds = metadata.durationSeconds
             $0.shouldAutoPlayAfterAudioReady = true
         }
+        await store.receive(.audioPlaybackToggled) {
+            $0.shouldAutoPlayAfterAudioReady = false
+        }
     }
 
     @Test
@@ -645,6 +660,8 @@ struct ResponseDetailFeatureTests {
             """
         )) {
             ResponseDetailFeature()
+        } withDependencies: {
+            $0.comparisonAudioRemoteControl = .testValue
         }
 
         await store.send(.onAppear)
@@ -652,6 +669,7 @@ struct ResponseDetailFeatureTests {
         await store.receive(.attributedStringRendered(rendered)) {
             $0.attributedString = rendered
         }
+        await store.receive(.audioPlaybackSnapshotReceived(.init(sourceID: nil, isPlaying: false, currentTimeSeconds: 0)))
 
         #expect(store.state.audioRelativePath == "ComparisonAudio/existing.m4a")
         #expect(store.state.audioDurationSeconds == 42.0)
@@ -954,10 +972,12 @@ struct ResponseDetailFeatureTests {
         }
         await store.send(.audioPlaybackStarted) {
             $0.isAudioPlaying = true
+            $0.currentSpeakerTurnIndex = 0
             $0.currentSpeakerTurnText = "Alex (Male): First line."
         }
         await store.send(.audioPlaybackProgressUpdated(2.5)) {
             $0.currentAudioTimeSeconds = 2.5
+            $0.currentSpeakerTurnIndex = 0
             $0.currentSpeakerTurnText = "Alex (Male): First line."
         }
         await store.send(.audioPlaybackPaused) {
@@ -965,8 +985,130 @@ struct ResponseDetailFeatureTests {
         }
         await store.send(.audioPlaybackFinished) {
             $0.currentAudioTimeSeconds = 0
+            $0.currentSpeakerTurnIndex = nil
             $0.currentSpeakerTurnText = nil
         }
+    }
+
+    @Test
+    func testAudioRemotePlayPauseCommands() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            shouldStartStreaming: false,
+            audioRelativePath: "comparison-audio.m4a"
+        )) {
+            ResponseDetailFeature()
+        } withDependencies: {
+            $0.comparisonAudioRemoteControl = .testValue
+        }
+
+        await store.send(.audioRemoteCommandReceived(.play))
+        await store.receive(.audioPlaybackToggled)
+
+        await store.send(.audioRemoteCommandReceived(.pause))
+    }
+
+    @Test
+    func testAudioRemotePreviousAndNextCommands() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            shouldStartStreaming: false,
+            audioRelativePath: "comparison-audio.m4a",
+            transcriptTurnTimings: [
+                PodcastTranscriptTurnTiming(
+                    speaker: "Alex (Male)",
+                    text: "First line.",
+                    startSeconds: 0,
+                    endSeconds: 5
+                ),
+                PodcastTranscriptTurnTiming(
+                    speaker: "Ava (Female)",
+                    text: "Second line.",
+                    startSeconds: 5,
+                    endSeconds: 10
+                ),
+                PodcastTranscriptTurnTiming(
+                    speaker: "Alex (Male)",
+                    text: "Third line.",
+                    startSeconds: 10,
+                    endSeconds: 15
+                )
+            ],
+            currentSpeakerTurnIndex: 1
+        )) {
+            ResponseDetailFeature()
+        } withDependencies: {
+            $0.comparisonAudioAssetStore.loadAudioData = { _ in Data("audio".utf8) }
+            $0.comparisonAudioRemoteControl = .testValue
+        }
+
+        await store.send(.audioRemoteCommandReceived(.previous))
+        await store.receive(.audioJumpToPreviousTurn)
+        await store.receive(.audioJumpToTurn(0)) {
+            $0.currentAudioTimeSeconds = 0
+            $0.currentSpeakerTurnIndex = 0
+            $0.currentSpeakerTurnText = "Alex (Male): First line."
+        }
+
+        await store.send(.audioRemoteCommandReceived(.next))
+        await store.receive(.audioJumpToNextTurn)
+        await store.receive(.audioJumpToTurn(1)) {
+            $0.currentAudioTimeSeconds = 5
+            $0.currentSpeakerTurnIndex = 1
+            $0.currentSpeakerTurnText = "Ava (Female): Second line."
+        }
+    }
+
+    @Test
+    func testAudioRemotePreviousCommandAtFirstTurnNoop() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            shouldStartStreaming: false,
+            transcriptTurnTimings: [
+                PodcastTranscriptTurnTiming(
+                    speaker: "Alex (Male)",
+                    text: "First line.",
+                    startSeconds: 0,
+                    endSeconds: 5
+                )
+            ],
+            currentSpeakerTurnIndex: 0
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.audioRemoteCommandReceived(.previous))
+        await store.receive(.audioJumpToPreviousTurn)
+    }
+
+    @Test
+    func testAudioRemoteNextCommandAtLastTurnNoop() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            shouldStartStreaming: false,
+            transcriptTurnTimings: [
+                PodcastTranscriptTurnTiming(
+                    speaker: "Alex (Male)",
+                    text: "Only line.",
+                    startSeconds: 0,
+                    endSeconds: 5
+                )
+            ],
+            currentSpeakerTurnIndex: 0
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.audioRemoteCommandReceived(.next))
+        await store.receive(.audioJumpToNextTurn)
     }
 
     @Test
@@ -1017,6 +1159,109 @@ struct ResponseDetailFeatureTests {
             $0.markdownDetail = MarkdownDetailFeature.State(
                 markdown: "## Result",
                 attributedString: rendered
+            )
+        }
+    }
+
+    @Test
+    func testTranscriptDetailButtonTappedNoopWhenTranscriptUnavailable() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            shouldStartStreaming: false
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.transcriptDetailButtonTapped)
+    }
+
+    @Test
+    func testTranscriptDetailButtonTappedPresentsTurnBasedTranscript() async {
+        let transcript = """
+        Alex (Male): First line.
+        Mia (Female): Second line.
+        """
+        let turns = [
+            PodcastTranscriptTurnTiming(
+                speaker: "Alex (Male)",
+                text: "First line.",
+                startSeconds: 0,
+                endSeconds: 5
+            ),
+            PodcastTranscriptTurnTiming(
+                speaker: "Mia (Female)",
+                text: "Second line.",
+                startSeconds: 5,
+                endSeconds: 10
+            )
+        ]
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            shouldStartStreaming: false,
+            podcastTranscript: transcript,
+            transcriptTurnTimings: turns
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.transcriptDetailButtonTapped) {
+            $0.transcriptDetail = PodcastTranscriptDetailFeature.State(
+                transcript: transcript,
+                turns: turns
+            )
+        }
+    }
+
+    @Test
+    func testDismissTranscriptDetailDestination() async {
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            shouldStartStreaming: false,
+            transcriptDetail: PodcastTranscriptDetailFeature.State(
+                transcript: "Alex (Male): Result",
+                turns: []
+            )
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.transcriptDetail(.dismiss)) {
+            $0.transcriptDetail = nil
+        }
+    }
+
+    @Test
+    func testTranscriptDetailCanReopenAfterDismiss() async {
+        let transcript = "Alex (Male): Result"
+        let store = TestStore(initialState: ResponseDetailFeature.State(
+            word1: "affect",
+            word2: "effect",
+            sentence: "The policy will affect the final effect.",
+            shouldStartStreaming: false,
+            podcastTranscript: transcript
+        )) {
+            ResponseDetailFeature()
+        }
+
+        await store.send(.transcriptDetailButtonTapped) {
+            $0.transcriptDetail = PodcastTranscriptDetailFeature.State(
+                transcript: transcript,
+                turns: []
+            )
+        }
+        await store.send(.transcriptDetail(.dismiss)) {
+            $0.transcriptDetail = nil
+        }
+        await store.send(.transcriptDetailButtonTapped) {
+            $0.transcriptDetail = PodcastTranscriptDetailFeature.State(
+                transcript: transcript,
+                turns: []
             )
         }
     }
